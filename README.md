@@ -154,5 +154,5 @@ The pipeline checks for the following:
 
 After the pipeline runs, in addition to the information presented in output, a coverage report will be generated and viewable from GitHub Actions:
 ```bash
-Actions > Click on the appropriate workflow run > Artifacts > View the coverage report HTML
+Actions > Click on the appropriate workflow run > Artifacts > Download the "coverage-html" artifact (ZIP file) > Unzip file > Open "index.html" to view coverage report
 ```
