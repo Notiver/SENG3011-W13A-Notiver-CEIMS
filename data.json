@@ -18,7 +18,9 @@
             "title": "title",
             "url": "www.news.com",
             "description": "sentence or two of description",
-            "content": "sentence or two of content"
+            "sentiment": 0.5,
+            "offence_type": "theft",
+            "lga": "lga"
         },
         {
             "time_object" : {
