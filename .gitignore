@@ -3,3 +3,14 @@ __pycache__/
 .env
 ml_models/
 data/
+.DS_Store
+node_modules/
+dist/
+build/
+target/
+.env.*
+*.log
+*.pyc
+.ipynb_checkpoints/
+.vscode/
+.idea/

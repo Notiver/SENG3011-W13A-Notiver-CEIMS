@@ -3,10 +3,13 @@ import boto3
 import newspaper
 from botocore.exceptions import NoCredentialsError
 
+
+load_dotenv()
+
 # Constants
-FILE_PATH = "/Users/pn/Desktop/UNSW/SENG3011/W13A-Notiver-SENG3011/backend/services/data-collection/guardian_crime_urls.txt"
-S3_BUCKET_NAME = "TO BE REPLACED WITH ACTUAL S3"
-S3_REGION = "ap-southeast-2"
+FILE_PATH = "guardian_crime_urls.txt"
+S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME") 
+S3_REGION = os.getenv("AWS_DEFAULT_REGION")
 
 def upload_to_s3(text_content, s3_key):
     """Uploads string content directly to an S3 object."""
@@ -42,7 +45,7 @@ def process_articles():
             content = article.text
             
             if content:
-                s3_filename = f"raw_news/article_{i}.txt"
+                s3_filename = f"news/article_{i}.txt"
                 
                 # 3. Send to S3
                 upload_to_s3(content, s3_filename)
