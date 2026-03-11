@@ -1,11 +1,13 @@
 from collections import defaultdict
-from crime_categories import CRIME_CATEGORY_MAP, CRIME_WEIGHTS
+from crime_categories import CRIME_WEIGHTS
+
+def get_lga_from_suburb(suburb):
+    return "PLACEHOLDER_LGA"
+
 
 def lga_aggregate(events):
-    stats = defaultdict(lambda: {
-        "violent": 0,
-        "motor": 0,
-        "property": 0,
+    lga_stats = defaultdict(lambda: {
+        "weighted_crime_score": 0,
         "total_crimes": 0
     })
 
@@ -14,31 +16,43 @@ def lga_aggregate(events):
         suburb = event.get("suburb")
         offence_type = event.get("offence_type")
 
+        if not suburb or not offence_type:
+            continue
+
         lga = get_lga_from_suburb(suburb)
 
-        category = map_offence_category(offence_type)
+        if not lga:
+            continue
 
-        lga_stats[lga][category] += 1
-        
-        # what is offence count?
+        offence_type = offence_type.lower()
+
+        # get weight of crime
+        weight = CRIME_WEIGHTS.get(offence_type, 1)
+
+        lga_stats[lga]["weighted_crime_score"] += weight
         lga_stats[lga]["total_crimes"] += 1
 
     return lga_stats
 
+
 def sentiment_scores(events):
-    # gives average? idk if we're going to do smtg else 
-    # but i'll stick with average for now
     sent_sum = {}
     sent_count = {}
 
     for event in events:
 
-        if "sentiment" not in event:
+        sentiment = event.get("sentiment")
+        suburb = event.get("suburb")
+
+        if sentiment is None or not suburb:
             continue
 
-        suburb = event.get("suburb")
         lga = get_lga_from_suburb(suburb)
-        sent_sum[lga] = sent_sum.get(lga, 0) + event["sentiment"]
+
+        if not lga:
+            continue
+
+        sent_sum[lga] = sent_sum.get(lga, 0) + sentiment
         sent_count[lga] = sent_count.get(lga, 0) + 1
 
     sent_scores = {}
@@ -47,6 +61,7 @@ def sentiment_scores(events):
         sent_scores[lga] = sent_sum[lga] / sent_count[lga]
 
     return sent_scores
+
 
 def stat_score(lga_stats, pop_data, exponent=100000):
     stat_scores = {}
@@ -58,11 +73,7 @@ def stat_score(lga_stats, pop_data, exponent=100000):
         if not pop or pop == 0:
             continue
 
-        weighted_sum = (
-            stats["violent"] * CRIME_WEIGHTS["violent"] +
-            stats["motor"] * CRIME_WEIGHTS["motor"] +
-            stats["property"] * CRIME_WEIGHTS["property"]
-        )
+        weighted_sum = stats["weighted_crime_score"]
 
         score = (weighted_sum / pop) * exponent
 
