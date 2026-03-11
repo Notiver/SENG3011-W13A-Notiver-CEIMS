@@ -9,5 +9,3 @@ def suburb_to_lga(suburb_name):
     suburb_name = suburb_name.strip().upper()
     lga = suburb_data.get(suburb_name, {}).get("councilname", "LGA not found")
     return lga.title()
-
-print(suburb_to_lga("randwick"))
