@@ -80,3 +80,23 @@ def stat_score(lga_stats, pop_data, exponent=100000):
         stat_scores[lga] = score
 
     return stat_scores
+
+
+def process_retrieval():
+    
+    # 1. getting from s3 
+    
+    #p rocessing stuff
+    
+    # put into dynamo 
+    
+    # Overall stats
+    # lga | sentiment | statistical | total crimes | total articles
+
+
+    # By year
+    # lga | year | sentiment | stats | total | violent | theft | property | drugs | judicial | other 
+
+
+if __name__ == "__main__":
+    process_retrieval()
