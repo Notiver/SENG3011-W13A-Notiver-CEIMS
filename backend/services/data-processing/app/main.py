@@ -4,6 +4,7 @@ import boto3
 import json
 from datetime import datetime
 from transformers import pipeline
+from utils.crime_classifier import classify_crime
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PARENT_DIR = os.path.abspath(os.path.join(BASE_DIR, ".."))
@@ -11,8 +12,6 @@ SERVICES_DIR = os.path.abspath(os.path.join(PARENT_DIR, ".."))
 
 if PARENT_DIR not in sys.path:
     sys.path.append(PARENT_DIR)
-
-from utils.crime_classifier import classify_crime
 
 LGA_JSON = os.path.join(SERVICES_DIR, "data-retrieval", "SUBURB_TO_LGA_DATA.json")
 
@@ -72,7 +71,8 @@ def process_and_finalize():
 
     for obj in response['Contents']:
         file_key = obj['Key']
-        if not file_key.endswith('.txt'): continue
+        if not file_key.endswith('.txt'): 
+          continue
 
         try:
             file_obj = s3.get_object(Bucket=S3_BUCKET_NAME, Key=file_key)
