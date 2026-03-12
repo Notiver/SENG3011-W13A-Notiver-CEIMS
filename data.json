@@ -4,7 +4,7 @@
     "version": "v1, maybe not needed?",
     "dataset_id:": "also not sure if this is needed",
     "time_object": {
-        "date": "2026-01-01",
+        "date_collected": "2026-01-01",
         "timezone": "GMT+11"
     },
     "events": [
@@ -30,6 +30,7 @@
             },
             "lga": "lga",
             "offence_type": "theft",
+            "offence_count": 10,
             "rate_per_100k": 2.4,
             "lga_rank": 1,
             "ten_year_trend": "increasing",
