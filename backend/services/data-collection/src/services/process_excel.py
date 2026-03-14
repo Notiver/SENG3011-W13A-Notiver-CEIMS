@@ -1,28 +1,16 @@
-import io
-import json
+"""Functionality to process the excel file"""
 
-import boto3
+import io
 import re
 from fastapi.responses import StreamingResponse
 import pandas as pd
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import UploadFile, File, HTTPException
 from datetime import date
 import config as config
 
 from models import Event, CrimeDataExport
 
-router = APIRouter()
-
-# for database
-# s3_client = boto3.client('s3')
-# BUCKET_NAME = "your-data-lake-bucket"
-
-@router.get("/")
-def root():
-    return {"Welcome to Notiver's homepage!"}
-
-"""Process the uploaded Excel file, clean and transform the data, and return it as JSON."""
-@router.post("/process-data")
+"""Processes the uploaded Excel file, cleans and transforms the data, and returns it as JSON."""
 def process_excel(my_file: UploadFile = File(...)):
     if not my_file.filename.endswith((".xlsx", ".xls")):
         raise HTTPException(status_code=400, detail="Invalid file type. Please upload an Excel file.")
@@ -83,12 +71,7 @@ def process_excel(my_file: UploadFile = File(...)):
     )
 
 
-@router.post("/process-news")
-def post_news():
-    return {"data": "Data created successfully!"}
-
-
-"""helper fn - to move??"""
+"""Helper function to parse the trend column and extract direction and percent change."""
 def parse_trend(value):
     if value is None or str(value).strip().lower() == 'nc':
         return {"direction": None, "percent": None}
