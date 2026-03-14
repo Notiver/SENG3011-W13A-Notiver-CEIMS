@@ -16,21 +16,19 @@ PD_ENGINE = 'calamine'
 DEFAULT_TIMEZONE = "GMT+11"
 
 # create settings class for AWS S3 settings
-class Settings(BaseSettings):
-    # Define your variables and their types
-    AWS_ACCESS_KEY_ID: str
-    AWS_SECRET_ACCESS_KEY: str
-    AWS_DEFAULT_REGION: str
-    S3_BUCKET_NAME: str
+# class Settings(BaseSettings):
+#     # Define your variables and their types
+#     AWS_PROFILE_NAME: str
+#     AWS_DEFAULT_REGION: str
+#     S3_BUCKET_NAME: str
 
-    # This tells Pydantic to look for a .env file
-    model_config = SettingsConfigDict(env_file="../.env") # kinda dodge, should change?
-
-# instantiate settings class
-settings = Settings()
+# # instantiate settings class
+# settings = Settings()
 
 # s3 bucket names
+S3_BUCKET_NAME="nsw-crime-data-bucket"
 EXCEL_BUCKET_NAME = "boscar"
 NEWS_BUCKET_NAME = "news"
 LINKS_BUCKET_NAME = "links"
 NLP_BUCKET_NAME = "nlp_processed"
+EXCEL_FILE_NAME = "crime_data.json"
