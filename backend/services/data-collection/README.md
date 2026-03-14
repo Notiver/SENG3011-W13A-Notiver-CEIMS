@@ -8,7 +8,7 @@ If required, configure AWS using awscli.
 
 ## Running the Service
 
-Make sure you are in the `src` directory when running the command.
+Make sure you are in the `app` directory when running the command.
 
 To start the server with auto-reload on code changes, run:
 
