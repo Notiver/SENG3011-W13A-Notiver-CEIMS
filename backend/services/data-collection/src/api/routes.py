@@ -14,7 +14,6 @@ def root():
 @router.post("/upload-data")
 def upload_data(my_file: UploadFile = File(...)):
     json_data = process_data(my_file)
-    # print(json_data)
     buffer = io.BytesIO(json_data.encode('utf-8'))
     file_name = config.EXCEL_BUCKET_NAME + "/" + config.EXCEL_FILE_NAME
     try:

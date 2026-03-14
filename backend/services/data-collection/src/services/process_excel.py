@@ -61,13 +61,6 @@ def process_data(my_file: UploadFile = File(...))-> str:
     )
     return final_output.model_dump_json()
 
-    # return StreamingResponse(
-    #     io.BytesIO(json_data.encode()),
-    #     media_type="application/json",
-    #     headers={"Content-Disposition": "attachment; filename=crime_export.json"}
-    # )
-
-
 def parse_trend(value):
     """Helper function to parse the trend column and extract direction and percent change."""
     
