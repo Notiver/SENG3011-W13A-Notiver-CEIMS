@@ -2,6 +2,10 @@
 
 This service runs a FastAPI application using Uvicorn.
 
+## Configure AWS S3
+
+If required, configure AWS using awscli.
+
 ## Running the Service
 
 Make sure you are in the `src` directory when running the command.
@@ -47,6 +51,7 @@ backend/services/data-collection/
     ├── api/                # Contains API route definitions and endpoints
     ├── services/           # Business logic and service layer
     ├── utils/              # Utility functions and helpers
+    ├── database/           # s3 logic and database layer
     ├── config.py           # Configuration settings for the service
     └── models.py           # Pydantic models and data schemas
 ```

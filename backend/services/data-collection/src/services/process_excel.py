@@ -1,5 +1,3 @@
-"""Functionality to process the excel file"""
-
 import io
 import re
 from fastapi.responses import StreamingResponse
@@ -10,8 +8,9 @@ import config as config
 
 from models import Event, CrimeDataExport
 
-"""Processes the uploaded Excel file, cleans and transforms the data, and returns it as JSON."""
-def process_excel(my_file: UploadFile = File(...)):
+def process_data(my_file: UploadFile = File(...))-> str:
+    """Processes the uploaded Excel file, cleans and transforms the data, and returns it as JSON."""
+    
     if not my_file.filename.endswith((".xlsx", ".xls")):
         raise HTTPException(status_code=400, detail="Invalid file type. Please upload an Excel file.")
 
@@ -62,17 +61,18 @@ def process_excel(my_file: UploadFile = File(...)):
         },
         events=all_events
     )
-    json_data = final_output.model_dump_json()
+    return final_output.model_dump_json()
 
-    return StreamingResponse(
-        io.BytesIO(json_data.encode()),
-        media_type="application/json",
-        headers={"Content-Disposition": "attachment; filename=crime_export.json"}
-    )
+    # return StreamingResponse(
+    #     io.BytesIO(json_data.encode()),
+    #     media_type="application/json",
+    #     headers={"Content-Disposition": "attachment; filename=crime_export.json"}
+    # )
 
 
-"""Helper function to parse the trend column and extract direction and percent change."""
 def parse_trend(value):
+    """Helper function to parse the trend column and extract direction and percent change."""
+    
     if value is None or str(value).strip().lower() == 'nc':
         return {"direction": None, "percent": None}
     
