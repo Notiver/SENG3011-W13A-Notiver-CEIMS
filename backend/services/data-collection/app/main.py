@@ -4,6 +4,7 @@
 # from botocore.exceptions import NoCredentialsError
 # from dotenv import load_dotenv
 from fastapi import FastAPI
+from mangum import Mangum
 from api.routes import router
 
 ######################################
@@ -12,8 +13,8 @@ from api.routes import router
 # main should just be the entry point to run the service, and call other functions to do the work.
 
 app = FastAPI()
-
 app.include_router(router)
+handler = Mangum(app)
 
 ######################################
 
