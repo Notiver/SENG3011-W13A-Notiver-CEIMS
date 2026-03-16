@@ -1,11 +1,11 @@
 import boto3
 import json
-import sys
 from datetime import datetime
 from transformers import pipeline
 
 from app import config
 from utils.crime_classifier import classify_crime
+from utils.location_classifier import get_location_metadata
 
 try:
     session = boto3.Session(profile_name=config.PROFILE_NAME)
@@ -19,28 +19,6 @@ sentiment_task = pipeline(
     model="cardiffnlp/twitter-roberta-base-sentiment-latest", 
     top_k=None
 )
-
-print("Loading JSON Suburb data...")
-try:
-    with open(config.LGA_JSON_PATH, 'r') as file:
-        suburb_data = json.load(file)
-except FileNotFoundError:
-    print(f"Error: Could not find JSON LGA data at {config.LGA_JSON_PATH}")
-    sys.exit(1)
-
-sorted_suburbs = sorted(suburb_data.keys(), key=len, reverse=True)
-
-def get_location_metadata(text):
-    text_lower = text.lower()
-    for suburb_name in sorted_suburbs:
-        if f" {suburb_name.lower()} " in f" {text_lower} ":            
-            suburb_info = suburb_data[suburb_name]
-            return {
-                "suburb": suburb_name.title(),
-                "lga": suburb_info.get("councilname", "Unknown LGA").title(),
-                "postcode": str(suburb_info.get("postcode", "0000")) 
-            }
-    return {"suburb": "NSW General", "lga": "Unknown", "postcode": "0000"}
 
 def run_nlp_pipeline():
     """Fetches articles from S3, processes them, and uploads the JSON results."""
@@ -129,7 +107,6 @@ def fetch_processed_data():
         response = s3.get_object(Bucket=config.S3_BUCKET_NAME, Key=bulk_s3_key)
         file_content = response['Body'].read().decode('utf-8')
         
-        # Parse JSON string into a Python list/dictionary
         return json.loads(file_content)
         
     except s3.exceptions.NoSuchKey:
