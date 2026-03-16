@@ -4,10 +4,13 @@ import newspaper
 from botocore.exceptions import NoCredentialsError
 from dotenv import load_dotenv
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+URL_FILE_PATH = os.path.join(BASE_DIR, "..", "..", "guardian_crime_urls.txt")
+
+
 load_dotenv()
 
 # Constants
-FILE_PATH = "guardian_crime_urls.txt"
 S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME") 
 S3_REGION = os.getenv("AWS_DEFAULT_REGION")
 
@@ -23,31 +26,29 @@ def upload_to_s3(text_content, s3_key):
         print(f"Error uploading to S3: {e}")
 
 def process_articles():
-    # 1. Read URLs from file
-    if not os.path.exists(FILE_PATH):
-        print(f"Error: File not found at {FILE_PATH}")
+    # Read URLs from file
+    if not os.path.exists(URL_FILE_PATH):
+        print(f"Error: File not found at {URL_FILE_PATH}")
         return
 
-    with open(FILE_PATH, 'r') as f:
+    with open(URL_FILE_PATH, 'r') as f:
         urls = [line.strip() for line in f if line.strip()]
 
     print(f"Found {len(urls)} URLs. Starting scrape...")
 
-    # 2. Scrape and Upload
+    # Scrape and Upload
     for i, url in enumerate(urls):
         try:
             # Newspaper4k extraction
             article = newspaper.article(url)
             article.download()
             article.parse()
-            
-            # Clean text
             content = article.text
             
             if content:
                 s3_filename = f"news/article_{i}.txt"
                 
-                # 3. Send to S3
+                # Send to S3
                 upload_to_s3(content, s3_filename)
             else:
                 print(f"Skipping {url}: No text content found.")

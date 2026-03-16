@@ -4,6 +4,7 @@ from fastapi.responses import StreamingResponse
 from services.process_excel import process_data
 from database.s3 import upload_fileobj_to_s3, collect_data
 import config as config
+from app.services.article_manager import execute_full_collection, fetch_collection_status
 
 router = APIRouter()
 
@@ -39,8 +40,11 @@ def get_data():
 
 @router.post("/upload-articles")
 def post_articles():
-    return {"data": "Data created successfully!"}
+    result = execute_full_collection()
+    if result["status"] == "error":
+         raise HTTPException(status_code=500, detail=result["message"])
+    return result
 
 @router.get("/collect-articles")
 def get_articles():
-    return {"data": "Data collected successfully!"}
+    return fetch_collection_status()
