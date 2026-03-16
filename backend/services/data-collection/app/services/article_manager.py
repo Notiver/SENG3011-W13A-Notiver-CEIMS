@@ -18,8 +18,3 @@ def execute_full_collection():
 
 def fetch_collection_status():
     return {"status": "success", "message": "System is ready for collection."}
-
-
-  # USE BOTO!!, what im up to: need to download docker and put the data processing to docker, turn that to lambda,
-  #  connect API gateway for all of them.
-  # Fix the routing path and how the code communicates with eachother. 
