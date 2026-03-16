@@ -65,4 +65,27 @@ jobs:
           aws lambda update-function-code \
             --function-name data-collection-function \
             --zip-file fileb://backend/services/data-collection/app/deployment.zip
-          
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push Processing image to ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: notiver-nlp-processor
+          IMAGE_TAG: latest
+        run: |
+          cd backend/services/data-processing
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+      - name: Deploy processing Lambda
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: notiver-nlp-processor
+          IMAGE_TAG: latest
+        run: |
+          aws lambda update-function-code \
+            --function-name data-processing-function \
+            --image-uri $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
