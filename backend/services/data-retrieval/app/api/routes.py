@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from app.services.retriever import run_nlp_pipeline, fetch_processed_data
+from app.services.retriever import process_retrieval
 
 router = APIRouter()
 
