@@ -53,3 +53,4 @@ def get_all_lgas():
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
