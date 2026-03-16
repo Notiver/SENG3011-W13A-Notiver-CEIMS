@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from app.services.retriever import process_retrieval
+from app.services.retriever import process_retrieval, lga_overall_table, lga_by_year_table
 
 router = APIRouter()
 
@@ -37,6 +37,19 @@ def get_lga_yearly(lga: str):
         )
 
         return response["Items"]
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@router.get("/lgas")
+def get_all_lgas():
+
+    try:
+        response = lga_overall_table.scan()
+
+        lgas = [item["lga"] for item in response.get("Items", [])]
+
+        return {"lgas": lgas}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
