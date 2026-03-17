@@ -201,7 +201,7 @@ def count_total_crimes(events):
 
     for event in events:
         lga_suburb = event.get("lga")
-        lga = LGA_FORRMAT_MAP.get(lga_suburb.upper(), "LGA mapping not found").title()
+        lga = LGA_FORMAT_MAP.get(lga_suburb.upper(), "LGA mapping not found").title()
 
         if lga != "LGA mapping not found":
             total_crimes[lga] += event.get("offence_count")
@@ -264,7 +264,7 @@ def stat_score(lga_stats):
 
     for lga_suburb, stats in lga_stats.items():
         
-        lga = LGA_FORRMAT_MAP.get(lga_suburb.upper(), "LGA mapping not found").title()
+        lga = LGA_FORMAT_MAP.get(lga_suburb.upper(), "LGA mapping not found").title()
 
         pop = get_lga_population(lga)
 
