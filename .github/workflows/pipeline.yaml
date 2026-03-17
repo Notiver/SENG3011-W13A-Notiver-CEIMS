@@ -99,8 +99,8 @@ jobs:
           IMAGE_TAG: ${{ github.sha }}
         run: |
           IMAGE_URI=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          ROLE_ARN="arn:aws:iam::359642223986:role/data-nlp-analytics-role-96kjz916"
-          
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          ROLE_ARN="arn:aws:iam::${ACCOUNT_ID}:role/service-role/data-nlp-analytics-role-96kjz916"          
           if aws lambda get-function --function-name data-nlp-analytics 2>/dev/null; then
             echo "Function exists. Updating code..."
             aws lambda update-function-code \
