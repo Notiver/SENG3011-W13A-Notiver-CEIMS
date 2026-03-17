@@ -38,7 +38,7 @@ def process_retrieval():
     lga_total_crimes = count_total_crimes(all_lga_stats)
     lga_total_articles = count_total_articles(all_article_events)
 
-    # upload_lga_overall_data(lga_sentiment_scores_all, lga_statistical_scores_all, lga_total_crimes, lga_total_articles)
+    upload_lga_overall_data(lga_sentiment_scores_all, lga_statistical_scores_all, lga_total_crimes, lga_total_articles)
 
     upload_lga_by_year_data()
 
