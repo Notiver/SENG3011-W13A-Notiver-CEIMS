@@ -27,7 +27,8 @@ export default function DemoPage() {
   useEffect(() => {
     const fetchMap = async () => {
       try {
-        const response = await fetch("https://citydata.ada.unsw.edu.au/geoserver/geonode/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=geonode%3ALGAs_Sydney_and_surrounds&outputFormat=application%2Fjson");
+        const response = await fetch("/data/sydney_lgas.json");
+         if (!response.ok) throw new Error("Local file not found");
         const data = await response.json();
         setGeoJsonData(data);
       } catch (e) {
@@ -56,9 +57,9 @@ export default function DemoPage() {
           <h1 className="text-3xl font-bold mb-2 text-center">Notiver CEIMS</h1>
           <p className="text-zinc-500 text-sm mb-8 text-center uppercase tracking-widest">Intelligence Portal</p>
           <div className="space-y-4">
-            <input type="email" placeholder="Officer Email" className="w-full bg-zinc-900 border border-zinc-700 p-3 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" />
-            <input type="password" placeholder="password" className="w-full bg-zinc-900 border border-zinc-700 p-3 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" />
-            <button onClick={() => setIsLoggedIn(true)} className="w-full bg-indigo-600 hover:bg-indigo-500 py-3 rounded-lg font-bold transition-all">Authorise Access</button>
+            <input type="email" placeholder="Email" className="w-full bg-zinc-900 border border-zinc-700 p-3 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" />
+            <input type="password" placeholder="Password" className="w-full bg-zinc-900 border border-zinc-700 p-3 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" />
+            <button onClick={() => setIsLoggedIn(true)} className="w-full bg-indigo-600 hover:bg-indigo-500 py-3 rounded-lg font-bold transition-all">Login</button>
           </div>
         </div>
       </div>
@@ -190,8 +191,17 @@ export default function DemoPage() {
                         fillOpacity: 0.2
                       }}
                       onEachFeature={(feature: any, layer: any) => {
-                        const name = feature.properties?.lga_name || "Unknown District";
-                        layer.bindPopup(`<b style="color:black">${name}</b>`);
+                        console.log(feature.properties)
+                        // Check multiple possible keys used by NSW government data
+                        const props = feature.properties;
+                        const name = props?.lga_name || props?.LGA_NAME || props?.abb_name || props?.nsw_lga__3 || "Unknown LGA";
+                        
+                        layer.bindPopup(`
+                          <div style="color: #18181b; font-family: sans-serif; padding: 4px;">
+                            <strong style="display: block; border-bottom: 1px solid #e4e4e7; margin-bottom: 4px;">LGA Info</strong>
+                            <span style="font-size: 14px;">${name}</span>
+                          </div>
+                        `);
                         
                         layer.on({
                           mouseover: (e: any) => e.target.setStyle({ fillOpacity: 0.6, weight: 3 }),
