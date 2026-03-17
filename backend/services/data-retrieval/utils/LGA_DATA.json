@@ -108,6 +108,12 @@
         "Pop Density (people per sq km)": "5,745.28"
     },
     "BYRON SHIRE COUNCIL": {
+        "Region": "Northern Rivers",
+        "Area (sq km)": "567",
+        "Population": "36,116",
+        "Pop Density (people per sq km)": "63.70"
+    },
+    "OBERON SHIRE COUNCIL": {
         "Region": "Central West",
         "Area (sq km)": "3,659",
         "Population": "5,580",
@@ -335,13 +341,19 @@
         "Population": "151,811",
         "Pop Density (people per sq km)": "328.59"
     },
-    "THE COUNCIL OF THE MUNICIPALITY OF KIAMA": {
+    "THE COUNCIL OF THE MUNICIPALITY OF HUNTERS HILL": {
         "Region": "Northern Suburbs",
         "Area (sq km)": "6",
         "Population": "13,559",
         "Pop Density (people per sq km)": "2,259.83"
     },
-    "INNER WEST COUNCIL": {
+    "THE COUNCIL OF THE MUNICIPALITY OF KIAMA": {
+        "Region": "Illawarra",
+        "Area (sq km)": "258",
+        "Population": "23,074",
+        "Pop Density (people per sq km)": "89.43"
+    },
+        "INNER WEST COUNCIL": {
         "Region": "Inner West",
         "Area (sq km)": "35",
         "Population": "182,818",
@@ -383,11 +395,17 @@
         "Population": "9,359",
         "Pop Density (people per sq km)": "2.61"
     },
-    "LACHLAN SHIRE COUNCIL": {
+    "WALCHA COUNCIL": {
         "Region": "New England",
         "Area (sq km)": "2,621",
         "Population": "3,016",
         "Pop Density (people per sq km)": "1.15"
+    },
+    "LACHLAN SHIRE COUNCIL": {
+        "Region": "Central West",
+        "Area (sq km)": "7,431",
+        "Population": "6,094",
+        "Pop Density (people per sq km)": "0.82"
     },
     "LAKE MACQUARIE CITY COUNCIL": {
         "Region": "Hunter",
@@ -576,6 +594,12 @@
         "Pop Density (people per sq km)": "7.72"
     },
     "RYDE CITY COUNCIL": {
+        "Region": "Northern Suburbs",
+        "Area (sq km)": "41",
+        "Population": "129,123",
+        "Pop Density (people per sq km)": "3,149.34"
+    },
+    "COUNCIL OF THE CITY OF SYDNEY": {
         "Region": "Sydney CBD",
         "Area (sq km)": "25",
         "Population": "211,632",

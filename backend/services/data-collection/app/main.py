@@ -13,7 +13,7 @@ from api.routes import router
 # main should just be the entry point to run the service, and call other functions to do the work.
 
 app = FastAPI()
-app.include_router(router)
+app.include_router(router, prefix="/data-collection")
 handler = Mangum(app)
 ######################################
 
