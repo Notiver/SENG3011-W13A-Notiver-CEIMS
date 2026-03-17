@@ -1,14 +1,11 @@
 import boto3
 import json
-import sys
-import os
 import app.config as config
 
 from collections import defaultdict
 from utils.lga_format_dict import LGA_FORRMAT_MAP
 from utils.crime_dict import CRIME_CATEGORY_MAP, CRIME_WEIGHTS
 from utils.LGAData import get_lga_population
-from decimal import Decimal
 
 all_article_events = []
 article_events_by_year = defaultdict(list)
