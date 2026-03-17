@@ -31,7 +31,7 @@ CRIME_CATEGORY_MAP = {
     "malicious damage to property": "property",
     "break and enter dwelling": "property",
     "break and enter non-dwelling": "property",
-    "Trespass": "property",
+    "trespass": "property",
 
     # ---- Drug offences ----
     "possession and/or use of cocaine": "drugs",
@@ -52,23 +52,23 @@ CRIME_CATEGORY_MAP = {
     "other drug offences": "drugs",
 
     # ---- Against judicial procedures ----
-    "Escape custody": "judicial",
-    "Breach Apprehended Violence Order": "judicial",
-    "Breach bail conditions": "judicial",
-    "Fail to appear": "judicial",
-    "Resist or hinder officer": "judicial",
-    "Other offences against justice procedures": "judicial",
+    "escape custody": "judicial",
+    "breach apprehended Violence Order": "judicial",
+    "breach bail conditions": "judicial",
+    "fail to appear": "judicial",
+    "resist or hinder officer": "judicial",
+    "other offences against justice procedures": "judicial",
 
     # ---- Other offences ----
-    "Prohibited and regulated weapons offences": "other",
-    "Betting and gaming offences": "other",
-    "Liquor offences": "other",
-    "Pornography offences": "other",
-    "Other offences": "other",
-    "Transport regulatory offences": "other",
-    "Offensive conduct": "other",
-    "Offensive language": "other",
-    "Criminal intent": "other",
+    "prohibited and regulated weapons offences": "other",
+    "betting and gaming offences": "other",
+    "liquor offences": "other",
+    "pornography offences": "other",
+    "other offences": "other",
+    "transport regulatory offences": "other",
+    "offensive conduct": "other",
+    "offensive language": "other",
+    "criminal intent": "other",
 }
 
 # Does the offence directly threaten life?
