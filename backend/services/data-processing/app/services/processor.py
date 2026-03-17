@@ -1,11 +1,12 @@
 import boto3
 import json
-import sys
+import requests
 from datetime import datetime
 from transformers import pipeline
 
 from app import config
 from utils.crime_classifier import classify_crime
+from utils.location_classifier import get_location_metadata
 
 try:
     session = boto3.Session(profile_name=config.PROFILE_NAME)
@@ -20,53 +21,35 @@ sentiment_task = pipeline(
     top_k=None
 )
 
-print("Loading JSON Suburb data...")
-try:
-    with open(config.LGA_JSON_PATH, 'r') as file:
-        suburb_data = json.load(file)
-except FileNotFoundError:
-    print(f"Error: Could not find JSON LGA data at {config.LGA_JSON_PATH}")
-    sys.exit(1)
-
-sorted_suburbs = sorted(suburb_data.keys(), key=len, reverse=True)
-
-def get_location_metadata(text):
-    text_lower = text.lower()
-    for suburb_name in sorted_suburbs:
-        if f" {suburb_name.lower()} " in f" {text_lower} ":            
-            suburb_info = suburb_data[suburb_name]
-            return {
-                "suburb": suburb_name.title(),
-                "lga": suburb_info.get("councilname", "Unknown LGA").title(),
-                "postcode": str(suburb_info.get("postcode", "0000")) 
-            }
-    return {"suburb": "NSW General", "lga": "Unknown", "postcode": "0000"}
-
 def run_nlp_pipeline():
-    """Fetches articles from S3, processes them, and uploads the JSON results."""
+    """Fetches articles via HTTP, processes them, and uploads the JSON results."""
     
-    prefix = f"{config.NEWS_BUCKET_NAME}/"
-    print(f"Scanning S3: {config.S3_BUCKET_NAME}/{prefix}")
+    # Placeholder URL. Defaulting to localhost for local testing. TODO CHANGE TO API GATEWAY LINK
+    collection_url = getattr(config, 'DATA_COLLECTION_URL', 'http://127.0.0.1:8000/collect-articles')
+    print(f"Fetching articles from {collection_url}...")
     
-    response = s3.list_objects_v2(Bucket=config.S3_BUCKET_NAME, Prefix=prefix)
+    try:
+        response = requests.get(collection_url)
+        response.raise_for_status()
+        payload = response.json()
+    except Exception as e:
+        return {"status": "error", "message": f"Failed to fetch from collection service: {e}"}
+        
+    articles = payload.get("articles", [])
     
-    if 'Contents' not in response:
-        return {"status": "success", "message": "No articles found in bucket."}
+    if not articles:
+        return {"status": "success", "message": "No articles found in collection service."}
 
     processed_count = 0
     skipped_count = 0
-    
     all_processed_data = []
 
-    for obj in response['Contents']:
-        file_key = obj['Key']
-        if not file_key.endswith('.txt'): 
-            continue
+    for article in articles:
+        file_key = article["file_key"]
+        text_content = article["content"]
+        metadata = article.get("metadata", {})
 
         try:
-            file_obj = s3.get_object(Bucket=config.S3_BUCKET_NAME, Key=file_key)
-            text_content = file_obj['Body'].read().decode('utf-8')
-            
             loc = get_location_metadata(text_content)
             offence = classify_crime(text_content)
             
@@ -75,7 +58,6 @@ def run_nlp_pipeline():
                 skipped_count += 1
                 continue
             
-            metadata = file_obj.get('Metadata', {})
             article_date = metadata.get('publish_date', datetime.now().isoformat())
             
             sentiment_results = sentiment_task(text_content[:1500])
@@ -129,7 +111,6 @@ def fetch_processed_data():
         response = s3.get_object(Bucket=config.S3_BUCKET_NAME, Key=bulk_s3_key)
         file_content = response['Body'].read().decode('utf-8')
         
-        # Parse JSON string into a Python list/dictionary
         return json.loads(file_content)
         
     except s3.exceptions.NoSuchKey:

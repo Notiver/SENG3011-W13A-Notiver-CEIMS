@@ -15,7 +15,6 @@ from api.routes import router
 app = FastAPI()
 app.include_router(router)
 handler = Mangum(app)
-
 ######################################
 
 # # Load secrets from the .env file
