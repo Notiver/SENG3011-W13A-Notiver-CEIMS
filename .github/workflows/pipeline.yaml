@@ -64,8 +64,7 @@ jobs:
             --python-version 3.11 \
             --only-binary=:all: \
             --find-links ./local_wheels \
-            -r requirements.txt
-            
+            -r requirements-lambda.txt            
           cd app
           cp -r main.py api/ database/ services/ utils/ config.py models.py package/
           cd package && zip -r ../deployment.zip .
