@@ -3,8 +3,18 @@
 import { useState, useEffect } from "react";
 import { MapContainer, TileLayer, GeoJSON } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
+import dynamic from "next/dynamic";
+interface MapProps {
+  geoJsonData: any;
+}
 
-// --- MOCK DATA ---
+const Map = dynamic(() => import("../components/Map"), { 
+  ssr: false,
+  loading: () => <div className="h-full w-full bg-zinc-900 animate-pulse flex items-center justify-center text-zinc-500">Initializing Satellite Link...</div>
+});
+
+
+
 const MOCK_RANKING = [
   { lga: "Sydney City", score: 88, trend: "up" },
   { lga: "Blacktown", score: 72, trend: "down" },
@@ -13,7 +23,7 @@ const MOCK_RANKING = [
 
 export default function DemoPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [activeTab, setActiveTab] = useState("scraper"); // scraper, map, ranking
+  const [activeTab, setActiveTab] = useState("scraper");
   const [loading, setLoading] = useState(false);
   
   // Scraper State
@@ -38,15 +48,32 @@ export default function DemoPage() {
     fetchMap();
   }, []);
 
-  const handleScrape = () => {
+  const handleScrape = async () => {
     setLoading(true);
-    setTimeout(() => {
-      setScrapedArticles([
-        { title: `Recent ${selectedCategory} trends in Greater Sydney`, source: "NSW Police News", date: "2026-03-17" },
-        { title: `Community briefing: ${selectedCategory} alerts`, source: "Local Gasette", date: "2026-03-16" },
-      ]);
+    
+    const API_URL_FETCH_ARTICLES = process.env.NEXT_PUBLIC_API_GATEWAY_URL_FETCH_ARTICLES;
+
+    try {
+      const response = await fetch(`${API_URL_FETCH_ARTICLES}/collect-articles?category=${selectedCategory}`);
+
+
+      if (response.status === 429) {
+        alert("Throttle Limit: Please wait before initiating another scan.");
+        setLoading(false);
+        return;
+      }
+
+      if (!response.ok) throw new Error("Failed to reach the Intelligence Service");
+      const data = await response.json();
+
+      setScrapedArticles(data.articles || data); 
+
+    } catch (error) {
+      console.error("Scraper Error:", error);
+      alert("Error connecting to AWS Lambda. Check CORS settings in API Gateway.");
+    } finally {
       setLoading(false);
-    }, 1200);
+    }
   };
 
   // --- LOGIN VIEW ---
@@ -160,58 +187,8 @@ export default function DemoPage() {
 
         {/* TAB 2: MAP */}
         {activeTab === "map" && (
-          <div className="h-full flex flex-col space-y-6 animate-in fade-in duration-500">
-            <header className="flex justify-between items-end">
-              <div>
-                <h1 className="text-4xl font-extrabold text-white">Geospatial Intel</h1>
-                <p className="text-zinc-400 mt-2">Visualising risk vectors across Greater Sydney LGAs.</p>
-              </div>
-              <div className="bg-zinc-900 px-4 py-2 rounded-lg border border-zinc-800 flex items-center gap-3">
-                <span className="text-xs font-bold text-zinc-500">LGA Filter:</span>
-                <select className="bg-transparent text-sm font-bold outline-none text-indigo-400">
-                  <option>All Districts</option>
-                  <option>Inner West</option>
-                  <option>Eastern Suburbs</option>
-                </select>
-              </div>
-            </header>
-
-            <div className="flex-1 rounded-3xl overflow-hidden border border-zinc-800 shadow-2xl relative">
-              <MapContainer center={[-33.8688, 151.2093]} zoom={10} className="h-full w-full outline-none" zoomControl={false}>
-                <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" attribution="CARTO" />
-                  {geoJsonData && (
-                    <GeoJSON 
-                      key={geoJsonData.features?.length || "loading"}
-                      data={geoJsonData} 
-                      style={{
-                        color: "#818cf8",
-                        weight: 2,
-                        opacity: 1,
-                        fillColor: "#4f46e5",
-                        fillOpacity: 0.2
-                      }}
-                      onEachFeature={(feature: any, layer: any) => {
-                        console.log(feature.properties)
-                        // Check multiple possible keys used by NSW government data
-                        const props = feature.properties;
-                        const name = props?.lga_name || props?.LGA_NAME || props?.abb_name || props?.nsw_lga__3 || "Unknown LGA";
-                        
-                        layer.bindPopup(`
-                          <div style="color: #18181b; font-family: sans-serif; padding: 4px;">
-                            <strong style="display: block; border-bottom: 1px solid #e4e4e7; margin-bottom: 4px;">LGA Info</strong>
-                            <span style="font-size: 14px;">${name}</span>
-                          </div>
-                        `);
-                        
-                        layer.on({
-                          mouseover: (e: any) => e.target.setStyle({ fillOpacity: 0.6, weight: 3 }),
-                          mouseout: (e: any) => e.target.setStyle({ fillOpacity: 0.2, weight: 2 })
-                        });
-                      }}
-                    />
-                  )}
-              </MapContainer>
-            </div>
+          <div className="flex-1 rounded-3xl overflow-hidden border border-zinc-800 shadow-2xl relative">
+            <Map geoJsonData={geoJsonData} />
           </div>
         )}
 
@@ -219,7 +196,7 @@ export default function DemoPage() {
         {activeTab === "ranking" && (
           <div className="max-w-4xl space-y-8 animate-in fade-in duration-500">
             <header>
-              <h1 className="text-4xl font-extrabold text-white">District Ranking</h1>
+              <h1 className="text-4xl font-extrabold text-white">LGA Ranking</h1>
               <p className="text-zinc-400 mt-2">Statistical severity index by Local Government Area.</p>
             </header>
 
@@ -227,7 +204,7 @@ export default function DemoPage() {
               <table className="w-full text-left">
                 <thead className="bg-zinc-900/80 text-zinc-500 text-[10px] uppercase font-bold tracking-widest border-b border-zinc-800">
                   <tr>
-                    <th className="p-6">District Name</th>
+                    <th className="p-6">LGA Name</th>
                     <th className="p-6">Risk Score</th>
                     <th className="p-6 text-right">Weekly Trend</th>
                   </tr>
