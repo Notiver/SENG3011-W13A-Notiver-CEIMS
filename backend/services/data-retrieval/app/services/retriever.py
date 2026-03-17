@@ -147,8 +147,8 @@ def upload_lga_by_year_data():
             lga = LGA_FORMAT_MAP.get(lga_suburb.upper(), "LGA mapping not found").title()
 
             category = CRIME_CATEGORY_MAP.get(stat.get("offence_type").lower(), "other")
-            table_entries[(lga, year)]["total"] += 1
-            table_entries[(lga, year)][category] += 1
+            table_entries[(lga, year)]["total"] += stat.get('offence_count')
+            table_entries[(lga, year)][category] += stat.get('offence_count')
 
         statistical_score_by_year = stat_score(lga_aggregate(list))
 
