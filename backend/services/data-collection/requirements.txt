@@ -13,6 +13,7 @@ feedparser==6.0.12
 filelock==3.25.1
 h11==0.16.0
 httptools==0.7.1
+httpx==0.28.1
 idna==3.11
 jmespath==1.1.0
 lxml==5.4.0
