@@ -3,7 +3,7 @@ import json
 import app.config as config
 
 from collections import defaultdict
-from utils.lga_format_dict import LGA_FORRMAT_MAP
+from utils.lga_format_dict import LGA_FORMAT_MAP
 from utils.crime_dict import CRIME_CATEGORY_MAP, CRIME_WEIGHTS
 from utils.LGAData import get_lga_population
 
@@ -144,7 +144,7 @@ def upload_lga_by_year_data():
     for year, list in lga_stats_by_year.items():
         for stat in list:
             lga_suburb = stat.get("lga")
-            lga = LGA_FORRMAT_MAP.get(lga_suburb.upper(), "LGA mapping not found").title()
+            lga = LGA_FORMAT_MAP.get(lga_suburb.upper(), "LGA mapping not found").title()
 
             category = CRIME_CATEGORY_MAP.get(stat.get("offence_type").lower(), "other")
             table_entries[(lga, year)]["total"] += 1

@@ -1,7 +1,7 @@
 # Auto-generated from SUBURB_TO_LGA_DATA.json
 # Mapping: lganame -> councilname
 
-LGA_FORRMAT_MAP = {
+LGA_FORMAT_MAP = {
     'ALBURY': 'ALBURY CITY COUNCIL',
     'ARMIDALE REGIONAL': 'ARMIDALE REGIONAL COUNCIL',
     'BALLINA': 'BALLINA SHIRE COUNCIL',
