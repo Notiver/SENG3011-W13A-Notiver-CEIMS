@@ -17,6 +17,7 @@ try:
     session = boto3.Session(profile_name=config.PROFILE_NAME)
     s3 = session.client('s3', region_name=config.REGION)
 except Exception:
+    session = boto3.Session()
     s3 = boto3.client('s3', region_name=config.REGION)
 
 # Connect to DynamoDB data
