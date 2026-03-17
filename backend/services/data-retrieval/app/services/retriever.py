@@ -132,8 +132,8 @@ def upload_lga_by_year_data():
         "other": 0
     })
 
-    for year, list in lga_stats_by_year.items():
-        for stat in list:
+    for year, stat_list in lga_stats_by_year.items():
+        for stat in stat_list:
             lga_suburb = stat.get("lga")
             lga = LGA_FORMAT_MAP.get(lga_suburb.upper(), "LGA mapping not found").title()
 
@@ -141,13 +141,13 @@ def upload_lga_by_year_data():
             table_entries[(lga, year)]["total"] += stat.get('offence_count')
             table_entries[(lga, year)][category] += stat.get('offence_count')
 
-        statistical_score_by_year = stat_score(lga_aggregate(list))
+        statistical_score_by_year = stat_score(lga_aggregate(stat_list))
 
         for lga, score in statistical_score_by_year.items():
             table_entries[(lga, year)]["stats"] = str(score)
 
     for year, list in article_events_by_year.items():
-        sentiment_score_by_year = sentiment_scores(list)
+        sentiment_score_by_year = sentiment_scores(stat_list)
 
         for lga, score in sentiment_score_by_year.items():
             table_entries[(lga, year)]["sentiment"] = str(score)
@@ -232,36 +232,31 @@ def lga_aggregate(events):
 
     for event in events:
         offence_type = event.get("offence_type")
-        lga = event.get("lga")
+        lga_suburb = event.get("lga")
+        lga = LGA_FORMAT_MAP.get(lga_suburb.upper(), "LGA mapping not found").title()
 
-        
-        if not offence_type or lga == "LGA not found":
+        if not offence_type or lga == "LGA mapping not found":
             continue
 
         offence_type = offence_type.lower()
 
-        # get weight of crime
-        weight = CRIME_WEIGHTS.get(offence_type, 1)
-
+        weight = CRIME_WEIGHTS.get(offence_type, 1) * event.get("offence_count")
         lga_stats[lga]["weighted_crime_score"] += weight
-        lga_stats[lga]["total_crimes"] += 1
+
+        lga_stats[lga]["total_crimes"] += event.get("offence_count")
 
     return lga_stats
 
 
 def stat_score(lga_stats):
-    exponent = 1000000
+    exponent = 100
     stat_scores = {}
 
-    for lga_suburb, stats in lga_stats.items():
-        
-        lga = LGA_FORMAT_MAP.get(lga_suburb.upper(), "LGA mapping not found").title()
+    for lga, stats in lga_stats.items():
 
         pop = get_lga_population(lga)
 
         if pop == -1 or pop == 0:
-            print(lga)
-            print(lga_suburb)
             continue
 
         weighted_sum = stats["weighted_crime_score"]
