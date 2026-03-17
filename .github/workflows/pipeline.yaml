@@ -55,7 +55,13 @@ jobs:
       - name: Install and zip collection service
         run: |
           cd backend/services/data-collection
-          pip install -r requirements.txt -t app/package/
+          pip install \
+            --platform manylinux2014_x86_64 \
+            --target app/package/ \
+            --implementation cp \
+            --python-version 3.11 \
+            --only-binary=:all: \
+            -r requirements.txt
           cd app
           cp -r main.py api/ database/ services/ utils/ config.py models.py package/
           cd package && zip -r ../deployment.zip .
