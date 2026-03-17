@@ -55,12 +55,8 @@ jobs:
       - name: Install and zip collection service
         run: |
           cd backend/services/data-collection
-          
-          # 1. Download the wheel file locally
           mkdir -p local_wheels
           wget https://www.piwheels.org/simple/sgmllib3k/sgmllib3k-1.0.0-py3-none-any.whl -O local_wheels/sgmllib3k-1.0.0-py3-none-any.whl
-          
-          # 2. Run the main install, telling pip to check the local folder for missing binaries
           pip install \
             --platform manylinux2014_x86_64 \
             --target app/package/ \
@@ -132,3 +128,29 @@ jobs:
           fi
           
           aws lambda wait function-updated --function-name data-nlp-analytics
+
+      - name: Build and push data-retrieval image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: notiver-data-retrieval
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          cd backend/services/data-retrieval
+          docker build \
+            --provenance=false \
+            --platform linux/amd64 \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+            .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+      - name: Deploy data-retrieval Lambda
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: notiver-data-retrieval
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          aws lambda update-function-code \
+            --function-name data-retrieval-function \
+            --image-uri $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
