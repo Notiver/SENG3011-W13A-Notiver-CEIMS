@@ -83,15 +83,6 @@ def process_statistics():
     return
 
 
-    # Overall stats
-    # lga | sentiment | statistical | total crimes | total articles
-
-
-    # By year
-    # lga | year | sentiment | stats | total | violent | theft | property | drugs | judicial | other 
-
-
-
 def upload_lga_overall_data(lga_sentiment_scores_all, lga_statistical_scores_all, lga_total_crimes, lga_total_articles):
     table_entries = defaultdict(lambda: {
         "sentiment_score": 0,
