@@ -6,6 +6,7 @@ from collections import defaultdict
 from utils.lga_format_dict import LGA_FORMAT_MAP
 from utils.crime_dict import CRIME_CATEGORY_MAP, CRIME_WEIGHTS
 from utils.LGAData import get_lga_population
+from decimal import Decimal
 
 all_article_events = []
 article_events_by_year = defaultdict(list)
@@ -93,10 +94,10 @@ def upload_lga_overall_data(lga_sentiment_scores_all, lga_statistical_scores_all
     })
 
     for lga, sent_score in lga_sentiment_scores_all.items():
-        table_entries[lga]["sentiment_score"] = str(sent_score)
+        table_entries[lga]["sentiment_score"] = Decimal(str(sent_score))
     
     for lga, stat_score in lga_statistical_scores_all.items():
-        table_entries[lga]["statistical_score"] = str(stat_score)
+        table_entries[lga]["statistical_score"] = Decimal(str(stat_score))
 
     for lga, crime_count in lga_total_crimes.items():
         table_entries[lga]["total_crimes"] = crime_count
@@ -145,13 +146,13 @@ def upload_lga_by_year_data():
         statistical_score_by_year = stat_score(lga_aggregate(stat_list))
 
         for lga, score in statistical_score_by_year.items():
-            table_entries[(lga, year)]["stats"] = str(score)
+            table_entries[(lga, year)]["stats"] = Decimal(str(score))
 
-    for year, list in article_events_by_year.items():
-        sentiment_score_by_year = sentiment_scores(stat_list)
+    for year, article_list in article_events_by_year.items():
+        sentiment_score_by_year = sentiment_scores(article_list)
 
         for lga, score in sentiment_score_by_year.items():
-            table_entries[(lga, year)]["sentiment"] = str(score)
+            table_entries[(lga, year)]["sentiment"] = Decimal(str(score))
  
     data = []
     for key, value in table_entries.items():
