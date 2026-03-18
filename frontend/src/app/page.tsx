@@ -36,7 +36,7 @@ export default function DemoPage() {
   useEffect(() => {
     const fetchMap = async () => {
       try {
-        const response = await fetch("/data/sydney_lgas.json");
+        const response = await fetch("/demo/sydney_lgas.json");
         if (!response.ok) throw new Error("Local file not found");
         const data = await response.json();
         setGeoJsonData(data);
@@ -92,7 +92,7 @@ export default function DemoPage() {
       console.error("Scraper Error - Initiating Fallback Override:", error);
       
       try {
-        const res = await fetch("/data/scraped_links.txt");
+        const res = await fetch("/demo/scraped_links.txt");
         if (res.ok) {
           const text = await res.text();
           const urls = text.split("\n").filter(url => url.trim() !== "");
