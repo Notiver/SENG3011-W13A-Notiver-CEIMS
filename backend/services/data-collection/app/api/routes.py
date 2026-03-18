@@ -8,7 +8,7 @@ from app.services.article_manager import execute_full_collection, fetch_collecti
 
 router = APIRouter()
 
-@router.get("/")
+@router.get("")
 def root():
     return {"Welcome to Notiver's homepage!"}
 
