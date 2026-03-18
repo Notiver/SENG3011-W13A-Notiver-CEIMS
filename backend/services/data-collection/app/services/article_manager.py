@@ -2,7 +2,7 @@ import os
 from app.utils.fetch_urls import get_random_monthly_articles
 from app.utils.article_scraper import process_articles
 from app.database.s3 import fetch_all_articles
-import app.config as config
+from app import config
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 URL_FILE_PATH = os.path.join(BASE_DIR, "..", "..", "guardian_crime_urls.txt")

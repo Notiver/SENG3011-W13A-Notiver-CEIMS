@@ -2,9 +2,9 @@ import re
 import pandas as pd
 from fastapi import UploadFile, File, HTTPException
 from datetime import date
-import config as config
+from app import config
 
-from models import Event, CrimeDataExport
+from app.models import Event, CrimeDataExport
 
 def process_data(my_file: UploadFile = File(...))-> str:
     """Processes the uploaded Excel file, cleans and transforms the data, and returns it as JSON."""
