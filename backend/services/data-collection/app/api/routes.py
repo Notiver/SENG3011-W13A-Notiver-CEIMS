@@ -1,9 +1,9 @@
 import io
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from fastapi.responses import StreamingResponse
-from services.process_excel import process_data
-from database.s3 import upload_fileobj_to_s3, collect_data
-import config as config
+from app.services.process_excel import process_data
+from app.database.s3 import upload_fileobj_to_s3, collect_data
+from app import config
 from app.services.article_manager import execute_full_collection, fetch_collection_status
 
 router = APIRouter()
