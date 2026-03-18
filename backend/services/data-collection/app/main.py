@@ -5,7 +5,7 @@
 # from dotenv import load_dotenv
 from fastapi import FastAPI
 from mangum import Mangum
-from api.routes import router
+from app.api.routes import router
 
 ######################################
 
