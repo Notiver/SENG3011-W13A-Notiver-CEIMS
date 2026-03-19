@@ -89,6 +89,7 @@ jobs:
           IMAGE_TAG: ${{ github.sha }}
         run: |
           cd backend/services/data-processing
+          cp ../data-retrieval/utils/SUBURB_TO_LGA_DATA.json ./SUBURB_TO_LGA_DATA.json
           docker build \
             --provenance=false \
             --platform linux/amd64 \
