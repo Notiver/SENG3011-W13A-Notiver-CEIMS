@@ -383,7 +383,7 @@ export default function DemoPage() {
 
         {/* --- MAP TAB --- */}
         {activeTab === "map" && (
-          <div className="flex-1 rounded-3xl overflow-hidden border border-zinc-800 shadow-2xl relative h-[600px]">
+          <div className="flex-1 rounded-3xl overflow-hidden border border-zinc-800 shadow-2xl relative h-150">
             <Map geoJsonData={geoJsonData} />
           </div>
         )}
@@ -409,7 +409,7 @@ export default function DemoPage() {
 
            <div className="bg-zinc-900/50 border border-zinc-800 p-6 rounded-3xl shadow-xl">
              <h3 className="text-zinc-400 font-bold uppercase text-xs tracking-widest mb-6">Threat Score Trend (2019 - 2024)</h3>
-             <div className="h-[300px] w-full">
+             <div className="h-75 w-full">
                <ResponsiveContainer width="100%" height="100%">
                  <LineChart data={MOCK_CHART_DATA} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
                    <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
