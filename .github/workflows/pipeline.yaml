@@ -140,7 +140,13 @@ jobs:
           sed -i "s/\${AWS_ACCOUNT_ID}/${{ secrets.AWS_ACCOUNT_ID }}/g" backend/infrastructure/openapi.yaml
           
       - name: Deploy API Gateway
-              run: |
-                aws apigatewayv2 reimport-api \
-                  --api-id hbjyijsell \
-                  --body file://backend/infrastructure/openapi.yaml
+        run: |
+          aws apigatewayv2 reimport-api \
+            --api-id hbjyijsell \
+            --body file://backend/infrastructure/openapi.yaml
+
+      - name: Create API Deployment
+        run: |
+          aws apigatewayv2 create-deployment \
+            --api-id hbjyijsell \
+            --stage-name '$default'
