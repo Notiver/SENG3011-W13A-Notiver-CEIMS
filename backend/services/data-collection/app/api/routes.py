@@ -7,9 +7,9 @@ from app.services.article_manager import execute_full_collection, fetch_collecti
 
 router = APIRouter()
 
-@router.get("")
+@router.get("/")
 def root():
-    return {"Welcome to Notiver's homepage!"}
+    return {"message": "Welcome to Notiver's homepage!"}
 
 @router.post("/upload-data")
 def upload_data(my_file: UploadFile = File(...)):

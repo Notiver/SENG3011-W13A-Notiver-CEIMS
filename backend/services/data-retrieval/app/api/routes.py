@@ -3,7 +3,7 @@ from app.services.retriever import process_retrieval, lga_overall_table, lga_by_
 
 router = APIRouter()
 
-@router.get("")
+@router.get("/")
 def root():
     return {"message": "Data Retrieval Service is running"}
 
