@@ -1,5 +1,4 @@
 import boto3
-import json
 import app.config as config
 import requests
 import sys
