@@ -1,5 +1,5 @@
 import boto3
-import config
+from app import config
 
 def upload_fileobj_to_s3(file_obj, bucket_name, s3_key):
     """Uploads a file-like object directly to an S3 object."""
