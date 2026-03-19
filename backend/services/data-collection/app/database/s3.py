@@ -1,4 +1,5 @@
 import boto3
+import config
 
 def upload_fileobj_to_s3(file_obj, bucket_name, s3_key):
     """Uploads a file-like object directly to an S3 object."""
@@ -15,6 +16,19 @@ def collect_data(bucket_name, s3_key):
     s3 = boto3.client('s3')
     response = s3.get_object(Bucket=bucket_name, Key=s3_key)
     return response['Body'], response.get('ContentType', 'application/json')
+
+def collect_data_url(bucket_name, s3_key):
+    """Generates a presigned S3 url (instead of streaming response)."""
+    s3 = boto3.client('s3')
+    url = s3.generate_presigned_url(
+        'get_object',
+        Params={
+            'Bucket': bucket_name, 
+            'Key': s3_key
+        },
+        ExpiresIn=config.EXPIRATION
+    )
+    return url
 
 def fetch_all_articles(bucket_name, prefix):
     """Fetches all article text files from S3 and returns them as a list of dicts."""

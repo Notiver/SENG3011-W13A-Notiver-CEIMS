@@ -20,3 +20,6 @@ NEWS_BUCKET_NAME = "news"
 LINKS_BUCKET_NAME = "links"
 NLP_BUCKET_NAME = "nlp_processed"
 EXCEL_FILE_NAME = "crime_data.json"
+
+# s3
+EXPIRATION=3600
