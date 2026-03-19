@@ -1,8 +1,7 @@
 import io
 from fastapi import APIRouter, HTTPException, UploadFile, File
-from fastapi.responses import StreamingResponse
 from app.services.process_excel import process_data
-from app.database.s3 import upload_fileobj_to_s3, collect_data
+from app.database.s3 import upload_fileobj_to_s3, collect_data_url
 from app import config
 from app.services.article_manager import execute_full_collection, fetch_collection_status
 
@@ -27,14 +26,8 @@ def upload_data(my_file: UploadFile = File(...)):
 def get_data():
     try:
         file_name = config.EXCEL_BUCKET_NAME + "/" + config.EXCEL_FILE_NAME
-        body_stream, content_type = collect_data(config.S3_BUCKET_NAME, file_name)
-        return StreamingResponse(
-            body_stream,
-            media_type=content_type,
-            headers={
-                "Content-Disposition": f"attachment; filename={config.EXCEL_FILE_NAME}"
-            }
-        )
+        url = collect_data_url(config.S3_BUCKET_NAME, file_name)
+        return {"url": url}
     except Exception as e:
         raise HTTPException(status_code=404, detail=f"Error finding file: {e}")
 
