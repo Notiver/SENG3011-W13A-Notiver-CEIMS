@@ -134,3 +134,13 @@ jobs:
           aws lambda update-function-code \
             --function-name data-retrieval-function \
             --image-uri $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+      - name: Inject AWS Account ID into OpenAPI spec
+        run: |
+          sed -i "s/\${AWS_ACCOUNT_ID}/${{ secrets.AWS_ACCOUNT_ID }}/g" backend/infrastructure/openapi.yaml
+          
+      - name: Deploy API Gateway
+        run: |
+          aws apigatewayv2 reimport-api \
+            --api-id hbjyijsell \
+            --body fileb://backend/infrastructure/openapi.yaml

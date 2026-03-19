@@ -24,8 +24,7 @@ sentiment_task = pipeline(
 def run_nlp_pipeline():
     """Fetches articles via HTTP, processes them, and uploads the JSON results."""
     
-    # Placeholder URL. Defaulting to localhost for local testing. TODO CHANGE TO API GATEWAY LINK!!
-    collection_url = getattr(config, 'DATA_COLLECTION_URL', 'http://127.0.0.1:8000/collect-articles')
+    collection_url = config.DATA_COLLECTION_URL
     print(f"Fetching articles from {collection_url}...")
     
     try:
