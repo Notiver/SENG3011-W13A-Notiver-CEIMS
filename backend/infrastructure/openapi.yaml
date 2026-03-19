@@ -3,7 +3,14 @@ info:
   title: Notiver CEIMS Unified API
   version: 1.0.0
 paths:
-  # SERVICE 1: DATA COLLECTION
+  # --- DATA COLLECTION SERVICE ---
+  /data-collection/collect-articles:
+    get:
+      x-amazon-apigateway-integration:
+        payloadFormatVersion: "2.0"
+        type: aws_proxy
+        uri: arn:aws:apigateway:ap-southeast-2:lambda:path/2015-03-31/functions/arn:aws:lambda:ap-southeast-2:${AWS_ACCOUNT_ID}:function:data-collection-function/invocations
+  
   /data-collection/{proxy+}:
     x-amazon-apigateway-any-method:
       x-amazon-apigateway-integration:
@@ -11,15 +18,14 @@ paths:
         type: aws_proxy
         uri: arn:aws:apigateway:ap-southeast-2:lambda:path/2015-03-31/functions/arn:aws:lambda:ap-southeast-2:${AWS_ACCOUNT_ID}:function:data-collection-function/invocations
 
-  # SERVICE 2: DATA RETRIEVAL
-  /data-retrieval/{proxy+}:
-    x-amazon-apigateway-any-method:
+  # --- DATA PROCESSING SERVICE ---
+  /data-processing/process-articles:
+    get:
       x-amazon-apigateway-integration:
         payloadFormatVersion: "2.0"
         type: aws_proxy
-        uri: arn:aws:apigateway:ap-southeast-2:lambda:path/2015-03-31/functions/arn:aws:lambda:ap-southeast-2:${AWS_ACCOUNT_ID}:function:data-retrieval-function/invocations
+        uri: arn:aws:apigateway:ap-southeast-2:lambda:path/2015-03-31/functions/arn:aws:lambda:ap-southeast-2:${AWS_ACCOUNT_ID}:function:data-nlp-analytics/invocations
 
-  # SERVICE 3: DATA NLP ANALYTICS
   /data-processing/{proxy+}:
     x-amazon-apigateway-any-method:
       x-amazon-apigateway-integration:
@@ -27,14 +33,17 @@ paths:
         type: aws_proxy
         uri: arn:aws:apigateway:ap-southeast-2:lambda:path/2015-03-31/functions/arn:aws:lambda:ap-southeast-2:${AWS_ACCOUNT_ID}:function:data-nlp-analytics/invocations
 
-components:
-  x-amazon-apigateway-cors:
-    allowOrigins:
-      - "*"
-    allowMethods:
-      - GET
-      - POST
-      - OPTIONS
-    allowHeaders:
-      - Content-Type
-      - Authorization
+  # --- DATA RETRIEVAL SERVICE ---
+  /data-retrieval/run-retrieval:
+    get:
+      x-amazon-apigateway-integration:
+        payloadFormatVersion: "2.0"
+        type: aws_proxy
+        uri: arn:aws:apigateway:ap-southeast-2:lambda:path/2015-03-31/functions/arn:aws:lambda:ap-southeast-2:${AWS_ACCOUNT_ID}:function:data-retrieval-function/invocations
+
+  /data-retrieval/{proxy+}:
+    x-amazon-apigateway-any-method:
+      x-amazon-apigateway-integration:
+        payloadFormatVersion: "2.0"
+        type: aws_proxy
+        uri: arn:aws:apigateway:ap-southeast-2:lambda:path/2015-03-31/functions/arn:aws:lambda:ap-southeast-2:${AWS_ACCOUNT_ID}:function:data-retrieval-function/invocations
