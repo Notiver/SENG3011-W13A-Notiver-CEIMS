@@ -251,7 +251,7 @@ def lga_aggregate(events):
 
 
 def stat_score(lga_stats):
-    exponent = 100
+    exponent = 0.1
     stat_scores = {}
 
     for lga, stats in lga_stats.items():
