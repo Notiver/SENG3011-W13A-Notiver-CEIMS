@@ -16,6 +16,14 @@ except Exception:
 
 def run_nlp_pipeline():
     """Fetches articles via HTTP, processes them, and uploads the JSON results."""
+
+    print("Loading RoBERTa model...")
+    sentiment_task = pipeline(
+      "sentiment-analysis", 
+      model="cardiffnlp/twitter-roberta-base-sentiment-latest", 
+      top_k=None
+    )
+
     
     print("Loading RoBERTa model...")
     sentiment_task = pipeline(
