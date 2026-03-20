@@ -116,8 +116,19 @@ export default function ScraperTab() {
         ))}
       </div>
 
+      {selectedCategory !== "crime" && (
+        <div className="bg-red-500/10 border border-red-500/30 text-red-400 p-4 rounded-xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2 text-sm font-medium shadow-sm">
+          <span className="text-xl">⚠️</span>
+          <span><strong>In development for sprint 2:</strong> Interoperability NLP service.</span>
+        </div>
+      )}
+
       <div className="flex gap-4 items-center">
-        <button onClick={handleScrape} disabled={loading || isProcessing} className="bg-white text-black px-8 py-3 rounded-full font-bold hover:bg-zinc-200 transition-all flex items-center gap-2 disabled:opacity-50">
+        <button 
+          onClick={handleScrape} 
+          disabled={loading || isProcessing || selectedCategory !== "crime"} 
+          className="bg-white text-black px-8 py-3 rounded-full font-bold hover:bg-zinc-200 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
           {loading ? "Initialising..." : "Activate Scraper"}
         </button>
         {(scrapedArticles.length > 0 || (isFallback && fullFallbackUrls.length > 0)) && (
