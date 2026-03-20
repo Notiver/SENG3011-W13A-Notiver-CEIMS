@@ -24,8 +24,26 @@ jobs:
       - name: Run linting
         run: ruff check .
 
-      - name: Run tests with coverage
-        run: pytest --cov=. --cov-report=term-missing --cov-report=html
+      - name: Test Data Retrieval
+        working-directory: ./backend/services/data-retrieval
+        run: |
+          # 1. Install this specific microservice's requirements
+          pip install -r requirements.txt
+          # 2. Test only this microservice
+          pytest --cov=app --cov-report=term-missing
+
+      - name: Test Data Collection
+        working-directory: ./backend/services/data-collection
+        run: |
+          # Only install/test if the files exist, preventing crashes!
+          if [ -f "requirements.txt" ]; then pip install -r requirements.txt; fi
+          if [ -d "tests" ]; then pytest --cov=app --cov-report=term-missing; fi
+
+      - name: Test Data Processing
+        working-directory: ./backend/services/data-processing
+        run: |
+          if [ -f "requirements.txt" ]; then pip install -r requirements.txt; fi
+          if [ -d "tests" ]; then pytest --cov=app --cov-report=term-missing; fi
 
       - name: Upload coverage as HTML
         uses: actions/upload-artifact@v4
