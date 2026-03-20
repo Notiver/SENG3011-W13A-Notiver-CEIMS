@@ -20,14 +20,40 @@ export default function RankingTab() {
       try {
         const { lgas } = await api.getAllLgas();
         
-        const statsPromises = lgas.map((lga: string) => api.getLgaStats(lga));
+        // Fetch stats and yearly trend for EACH LGA concurrently
+        const statsPromises = lgas.map(async (lga: string) => {
+          try {
+            const stats = await api.getLgaStats(lga);
+            const yearly = await api.getLgaYearlyStats(lga).catch(() => null);
+            
+            let trend = "stable";
+            
+            // Calculate trend based on live yearly data api!! 
+            if (yearly && yearly.length >= 2) {
+              const sortedYears = yearly.sort((a: any, b: any) => b.year - a.year);
+              const latestTotal = sortedYears[0].total;
+              const previousTotal = sortedYears[1].total;
+              
+              if (latestTotal > previousTotal) trend = "up";
+              else if (latestTotal < previousTotal) trend = "down";
+            }
+
+            return {
+              lga: stats.lga,
+              score: Math.round(stats.statistical_score || 0), 
+              trend: trend, 
+            };
+          } catch (e) {
+            console.warn(`Failed to fetch data for ${lga}`);
+            return null;
+          }
+        });
+        
         const results = await Promise.all(statsPromises);
         
-        const formattedData: RankingItem[] = results.map((res: any) => ({
-          lga: res.overall.lga,
-          score: Math.round(res.overall.sentiment_score * 100),
-          trend: "stable", 
-        })).sort((a, b) => b.score - a.score);
+        const formattedData = results
+          .filter((item) => item !== null)
+          .sort((a: any, b: any) => b.score - a.score) as RankingItem[];
 
         setRankingData(formattedData);
       } catch (error) {
@@ -40,7 +66,8 @@ export default function RankingTab() {
     fetchRankingData();
   }, []);
 
-  if (loading) return <div className="p-8 text-zinc-400">Loading live threat data...</div>;
+  if (loading) return <div className="p-8 text-emerald-400 font-mono animate-pulse">Fetching and compiling live threat data...</div>;
+
   return (
     <div className="max-w-5xl space-y-8 animate-in fade-in duration-500">
       <header>
@@ -60,7 +87,7 @@ export default function RankingTab() {
 
       <div className="bg-zinc-900/50 border border-zinc-800 p-6 rounded-3xl shadow-xl">
         <h3 className="text-zinc-400 font-bold uppercase text-xs tracking-widest mb-6">Threat Score Trend (2019 - 2024)</h3>
-        <div className="h-75 min-h-75 w-full">
+        <div className="min-h-75 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={MOCK_CHART_DATA} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
@@ -85,7 +112,7 @@ export default function RankingTab() {
           <thead className="bg-zinc-900/80 text-zinc-500 text-[10px] uppercase font-bold tracking-widest border-b border-zinc-800">
             <tr>
               <th className="p-6">LGA Name</th>
-              <th className="p-6">Risk Score (Sentiment + BOSCAR)</th>
+              <th className="p-6">Risk Score (Statistical)</th>
               <th className="p-6 text-right">Yearly Trend</th>
             </tr>
           </thead>
