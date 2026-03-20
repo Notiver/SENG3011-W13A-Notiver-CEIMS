@@ -25,6 +25,13 @@ def run_nlp_pipeline():
     )
 
     
+    print("Loading RoBERTa model...")
+    sentiment_task = pipeline(
+        "sentiment-analysis", 
+        model="cardiffnlp/twitter-roberta-base-sentiment-latest", 
+        top_k=None
+    )
+    
     collection_url = config.DATA_COLLECTION_URL
     print(f"Fetching articles from {collection_url}...")
     
