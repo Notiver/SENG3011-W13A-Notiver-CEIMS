@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from app.services.retriever import process_retrieval, lga_overall_table, lga_by_year_table
 
 router = APIRouter()
@@ -16,9 +16,10 @@ def run_retrieval():
         raise HTTPException(status_code=500, detail=f"Pipeline error: {str(e)}")
 
 @router.get("/lga/{lga}")
-def get_lga_stats(lga: str):
+def get_lga_stats(lga: str, db=Depends(get_dynamodb_resource)):
     try:
-        response = lga_overall_table.get_item(Key={"lga": lga})
+        table = db.Table('lga-overall')
+        response = table.get_item(Key={"lga": lga})
 
         if "Item" not in response:
             raise HTTPException(status_code=404, detail="LGA not found")
