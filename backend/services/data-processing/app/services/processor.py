@@ -14,18 +14,25 @@ try:
 except Exception:
     s3 = boto3.client('s3', region_name=config.REGION)
 
-print("Loading RoBERTa model...")
-sentiment_task = pipeline(
-    "sentiment-analysis", 
-    model="cardiffnlp/twitter-roberta-base-sentiment-latest", 
-    top_k=None
-)
-
 def run_nlp_pipeline():
     """Fetches articles via HTTP, processes them, and uploads the JSON results."""
+
+    print("Loading RoBERTa model...")
+    sentiment_task = pipeline(
+      "sentiment-analysis", 
+      model="cardiffnlp/twitter-roberta-base-sentiment-latest", 
+      top_k=None
+    )
+
     
-    # Placeholder URL. Defaulting to localhost for local testing. TODO CHANGE TO API GATEWAY LINK!!
-    collection_url = getattr(config, 'DATA_COLLECTION_URL', 'http://127.0.0.1:8000/collect-articles')
+    print("Loading RoBERTa model...")
+    sentiment_task = pipeline(
+        "sentiment-analysis", 
+        model="cardiffnlp/twitter-roberta-base-sentiment-latest", 
+        top_k=None
+    )
+    
+    collection_url = config.DATA_COLLECTION_URL
     print(f"Fetching articles from {collection_url}...")
     
     try:

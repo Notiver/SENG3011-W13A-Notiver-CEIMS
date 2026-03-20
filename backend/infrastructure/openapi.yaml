@@ -1,0 +1,31 @@
+openapi: 3.0.1
+info:
+  title: Notiver CEIMS Unified API
+  version: 1.0.0
+paths:
+  # --- DATA COLLECTION SERVICE ---
+  /data-collection/{proxy+}:
+    x-amazon-apigateway-any-method:
+      x-amazon-apigateway-integration:
+        payloadFormatVersion: "2.0"
+        type: "aws_proxy"
+        httpMethod: "POST"
+        uri: "arn:aws:apigateway:ap-southeast-2:lambda:path/2015-03-31/functions/arn:aws:lambda:ap-southeast-2:${AWS_ACCOUNT_ID}:function:data-collection-function/invocations"
+
+  # --- DATA PROCESSING SERVICE ---
+  /data-processing/{proxy+}:
+    x-amazon-apigateway-any-method:
+      x-amazon-apigateway-integration:
+        payloadFormatVersion: "2.0"
+        type: "aws_proxy"
+        httpMethod: "POST"
+        uri: "arn:aws:apigateway:ap-southeast-2:lambda:path/2015-03-31/functions/arn:aws:lambda:ap-southeast-2:${AWS_ACCOUNT_ID}:function:data-nlp-analytics/invocations"
+
+  # --- DATA RETRIEVAL SERVICE ---
+  /data-retrieval/{proxy+}:
+    x-amazon-apigateway-any-method:
+      x-amazon-apigateway-integration:
+        payloadFormatVersion: "2.0"
+        type: "aws_proxy"
+        httpMethod: "POST"
+        uri: "arn:aws:apigateway:ap-southeast-2:lambda:path/2015-03-31/functions/arn:aws:lambda:ap-southeast-2:${AWS_ACCOUNT_ID}:function:data-retrieval-function/invocations"

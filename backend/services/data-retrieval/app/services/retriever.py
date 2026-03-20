@@ -1,26 +1,28 @@
 import boto3
-import json
 import app.config as config
+import requests
+import sys
 
 from collections import defaultdict
 from utils.lga_format_dict import LGA_FORMAT_MAP
 from utils.crime_dict import CRIME_CATEGORY_MAP, CRIME_WEIGHTS
 from utils.LGAData import get_lga_population
+from decimal import Decimal
 
 all_article_events = []
 article_events_by_year = defaultdict(list)
 all_lga_stats = []
 lga_stats_by_year = defaultdict(list)
 
-# Initialise AWS session and connect to S3 data
-try:
-    session = boto3.Session(profile_name=config.PROFILE_NAME)
-    s3 = session.client('s3', region_name=config.REGION)
-except Exception:
-    s3 = boto3.client('s3', region_name=config.REGION)
 
 # Connect to DynamoDB data
-dynamodb = session.resource('dynamodb', region_name=config.REGION)
+try:
+    session = boto3.Session(profile_name=config.PROFILE_NAME)
+    dynamodb = session.resource('dynamodb', region_name=config.REGION)
+except Exception:
+    session = boto3.Session()
+    dynamodb = boto3.resource('dynamodb', region_name=config.REGION)
+
 lga_overall_table = dynamodb.Table('lga-overall')
 lga_by_year_table = dynamodb.Table('lga-by-year')
 
@@ -41,17 +43,16 @@ def process_retrieval():
 
 
 def process_articles():
-    file_key = "nlp_processed/all_processed_articles.json"
+    url = config.API_URL + "/data-processing/processed-articles"
+    response = requests.get(url)
 
-    try:
-        response = s3.get_object(Bucket=config.S3_BUCKET_NAME, Key=file_key)
-        text_content = response['Body'].read().decode('utf-8')
-        data = json.loads(text_content)
+    if response.status_code == 200:
+        data = response.json()
         all_article_events.extend(data)
 
-
-    except Exception as e:
-        print(f"Error processing {file_key}: {e}")  
+    else:
+        print(f"Error {response.status_code}: {response.reason}")
+        sys.exit(response.status_code)
 
     for event in all_article_events:
         year = event.get('when').split('-')[0]
@@ -61,15 +62,22 @@ def process_articles():
 
 
 def process_statistics():
-    file_key = "boscar/crime_data.json"
+    url = config.API_URL + "/data-collection/collect-data"
+    response = requests.get(url)
 
-    try:
-        response = s3.get_object(Bucket=config.S3_BUCKET_NAME, Key=file_key)
-        text_content = response['Body'].read().decode('utf-8')
-        data = json.loads(text_content)
+    if response.status_code == 200:
+        data_link = response.json().get('url')
+        response2 = requests.get(data_link)
 
-    except Exception as e:
-        print(f"Error processing {file_key}: {e}")  
+        if response2.status_code != 200:
+            print(f"Error {response.status_code}: {response.reason}")
+            sys.exit(response.status_code)
+
+        data = response2.json()
+
+    else:
+        print(f"Error {response.status_code}: {response.reason}")
+        sys.exit(response.status_code)
 
     if data.get('data_source') != "BOSCAR Data" or data.get('data_type') != "Dataset":
         return
@@ -92,10 +100,10 @@ def upload_lga_overall_data(lga_sentiment_scores_all, lga_statistical_scores_all
     })
 
     for lga, sent_score in lga_sentiment_scores_all.items():
-        table_entries[lga]["sentiment_score"] = str(sent_score)
+        table_entries[lga]["sentiment_score"] = Decimal(str(sent_score))
     
     for lga, stat_score in lga_statistical_scores_all.items():
-        table_entries[lga]["statistical_score"] = str(stat_score)
+        table_entries[lga]["statistical_score"] = Decimal(str(stat_score))
 
     for lga, crime_count in lga_total_crimes.items():
         table_entries[lga]["total_crimes"] = crime_count
@@ -144,13 +152,13 @@ def upload_lga_by_year_data():
         statistical_score_by_year = stat_score(lga_aggregate(stat_list))
 
         for lga, score in statistical_score_by_year.items():
-            table_entries[(lga, year)]["stats"] = str(score)
+            table_entries[(lga, year)]["stats"] = Decimal(str(score))
 
-    for year, list in article_events_by_year.items():
-        sentiment_score_by_year = sentiment_scores(stat_list)
+    for year, article_list in article_events_by_year.items():
+        sentiment_score_by_year = sentiment_scores(article_list)
 
         for lga, score in sentiment_score_by_year.items():
-            table_entries[(lga, year)]["sentiment"] = str(score)
+            table_entries[(lga, year)]["sentiment"] = Decimal(str(score))
  
     data = []
     for key, value in table_entries.items():

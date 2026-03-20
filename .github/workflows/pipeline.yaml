@@ -52,46 +52,17 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-southeast-2
 
-      - name: Install and zip collection service
-        run: |
-          cd backend/services/data-collection
-          mkdir -p local_wheels
-          wget https://www.piwheels.org/simple/sgmllib3k/sgmllib3k-1.0.0-py3-none-any.whl -O local_wheels/sgmllib3k-1.0.0-py3-none-any.whl
-          pip install \
-            --platform manylinux2014_x86_64 \
-            --target app/package/ \
-            --implementation cp \
-            --python-version 3.11 \
-            --only-binary=:all: \
-            --find-links ./local_wheels \
-            -r requirements.txt
-          cd app
-          cp -r main.py api/ database/ services/ utils/ config.py models.py package/
-          cd package && zip -r ../deployment.zip .
-
-      - name: Upload collection zip to S3
-        run: |
-          aws s3 cp backend/services/data-collection/app/deployment.zip \
-            s3://notiver-deployment-bucket/collection-deployment.zip
-
-      - name: Deploy collection Lambda from S3
-        run: |
-          aws lambda update-function-code \
-            --function-name data-collection-function \
-            --s3-bucket notiver-deployment-bucket \
-            --s3-key collection-deployment.zip
-
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build, tag, and push Processing image to ECR
+      - name: Build, tag and push data-collection image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: notiver-nlp-processor
+          ECR_REPOSITORY: notiver-data-collection
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          cd backend/services/data-processing
+          cd backend/services/data-collection
           docker build \
             --provenance=false \
             --platform linux/amd64 \
@@ -101,29 +72,81 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
 
-      - name: Create or update NLP Lambda
+      - name: Deploy data-collection Lambda
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: notiver-data-collection
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          aws lambda update-function-code \
+            --function-name data-collection-function \
+            --image-uri $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+      - name: Build, tag, and push data-processing image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: notiver-nlp-processor
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          IMAGE_URI=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          ROLE_ARN="arn:aws:iam::${ACCOUNT_ID}:role/service-role/data-nlp-analytics-role-96kjz916"          
-          if aws lambda get-function --function-name data-nlp-analytics 2>/dev/null; then
-            echo "Function exists. Updating code..."
-            aws lambda update-function-code \
-              --function-name data-nlp-analytics \
-              --image-uri $IMAGE_URI
-          else
-            echo "Function does not exist. Creating..."
-            aws lambda create-function \
-              --function-name data-nlp-analytics \
-              --package-type Image \
-              --code ImageUri=$IMAGE_URI \
-              --role $ROLE_ARN \
-              --timeout 120 \
-              --memory-size 1024
-          fi
+          cd backend/services/data-processing
+          cp ../data-retrieval/utils/SUBURB_TO_LGA_DATA.json ./SUBURB_TO_LGA_DATA.json
+          docker build \
+            --provenance=false \
+            --platform linux/amd64 \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+            .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+      - name: Deploy data-processing Lambda
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: notiver-nlp-processor
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          aws lambda update-function-code \
+            --function-name data-nlp-analytics \
+            --image-uri $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+      - name: Build, tag and push data-retrieval image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: notiver-data-retrieval
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          cd backend/services/data-retrieval
+          docker build \
+            --provenance=false \
+            --platform linux/amd64 \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+            .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+      - name: Deploy data-retrieval Lambda
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: notiver-data-retrieval
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          aws lambda update-function-code \
+            --function-name data-retrieval-function \
+            --image-uri $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+      - name: Inject AWS Account ID into OpenAPI spec
+        run: |
+          sed -i "s/\${AWS_ACCOUNT_ID}/${{ secrets.AWS_ACCOUNT_ID }}/g" backend/infrastructure/openapi.yaml
           
-          aws lambda wait function-updated --function-name data-nlp-analytics
+      - name: Deploy API Gateway
+        run: |
+          aws apigatewayv2 reimport-api \
+            --api-id hbjyijsell \
+            --body file://backend/infrastructure/openapi.yaml
+
+      - name: Create API Deployment
+        run: |
+          aws apigatewayv2 create-deployment \
+            --api-id hbjyijsell \
+            --stage-name '$default'

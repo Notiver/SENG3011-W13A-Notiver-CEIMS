@@ -1,7 +1,7 @@
 from pydantic import BaseModel, ConfigDict, Field
 from typing import List, Optional
 
-import config as config
+from app import config
 
 class DataTimeObject(BaseModel):
     date_start: str
