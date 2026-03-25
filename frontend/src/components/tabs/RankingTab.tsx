@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
-import { MOCK_CHART_DATA } from "@/lib/mockData";
+import { MOCK_CHART_DATA } from "@/lib/dataLabels";
 import { api } from "@/lib/api";
 
 interface RankingItem {
