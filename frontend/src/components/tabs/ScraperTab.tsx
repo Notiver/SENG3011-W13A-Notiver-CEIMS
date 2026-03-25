@@ -6,7 +6,6 @@ import { MAJOR_CITIES } from "@/lib/majorCities";
 import { CEIMS_CATEGORIES, INTEROP_CATEGORIES } from "@/lib/dataLabels";
 import { Maximize2, Minimize2 } from 'lucide-react';
 
-
 export default function ScraperTab() {
   const [loading, setLoading] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("crime");
@@ -29,6 +28,7 @@ export default function ScraperTab() {
   const [processStep, setProcessStep] = useState(0);
 
   const terminalEndRef = useRef<HTMLDivElement>(null);
+  const isInteropCategory = INTEROP_CATEGORIES.some(c => c.id === selectedCategory);
 
   // Typewriter / Cascading effect for Real Articles
   useEffect(() => {
@@ -40,7 +40,6 @@ export default function ScraperTab() {
     }
   }, [isFallback, isProcessing, fullScrapedArticles, scrapedArticles]);
 
-  // Typewriter effect for Fallback URLs
   useEffect(() => {
     if (isFallback && visibleFallbackUrls.length < fullFallbackUrls.length) {
       const timer = setTimeout(() => {
@@ -78,7 +77,6 @@ export default function ScraperTab() {
       setFullScrapedArticles(data.articles || data);
 
     } catch (error) {
-      
       console.error("Scraper Error - Initiating Fallback Override:", error);
       try {
         const res = await fetch("/demo/scraped_links.txt");
@@ -116,7 +114,6 @@ export default function ScraperTab() {
 
   const handleDownload = () => {
     let content = "";
-    
     if (isFallback) {
       content = fullFallbackUrls.join("\n");
     } else {
@@ -146,7 +143,6 @@ export default function ScraperTab() {
 
       {/* Category Selection Container */}
       <div className="space-y-4">
-        {/* Core CEIMS Row */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {CEIMS_CATEGORIES.map((cat) => (
             <button
@@ -166,25 +162,19 @@ export default function ScraperTab() {
           ))}
         </div>
 
-        {/* Reveal Button */}
         <div className="flex justify-center">
           <button 
             onClick={() => setShowInterop(!showInterop)}
             className="text-xs font-bold text-zinc-500 uppercase tracking-widest hover:text-white transition-colors flex items-center gap-2 py-2"
           >
             {showInterop ? (
-              <>
-                Hide Interoperability Suite <Minimize2 />
-              </>
+              <>Hide Interoperability Suite <Minimize2 className="w-3 h-3" /></>
             ) : (
-              <>
-                Reveal Interoperability Suite <Maximize2 />
-              </>
+              <>Reveal Interoperability Suite <Maximize2 className="w-3 h-3" /></>
             )}
           </button>
         </div>
 
-        {/* Interoperability Suite Row (Hidden by default) */}
         {showInterop && (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 animate-in slide-in-from-top-2 fade-in duration-300">
             {INTEROP_CATEGORIES.map((cat) => (
@@ -207,7 +197,7 @@ export default function ScraperTab() {
         )}
       </div>
 
-      {selectedCategory !== "crime" && (
+      {isInteropCategory && (
         <div className="bg-red-500/10 border border-red-500/30 text-red-400 p-4 rounded-xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2 text-sm font-medium shadow-sm">
           <span className="text-xl">⚠️</span>
           <span><strong>In development for sprint 2:</strong> Interoperability NLP service.</span>
@@ -217,25 +207,19 @@ export default function ScraperTab() {
       {/* Search Parameters Configuration */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-zinc-900/40 p-5 rounded-2xl border border-zinc-800/80 shadow-inner">
         <div>
-          <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-2 block ml-1">
-            Target Location
-          </label>
+          <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-2 block ml-1">Target Location</label>
           <select 
             value={location}
             onChange={(e) => setLocation(e.target.value)}
             className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 transition-colors appearance-none cursor-pointer"
           >
             {MAJOR_CITIES.map((city) => (
-              <option key={city} value={city}>
-                {city}
-              </option>
+              <option key={city} value={city}>{city}</option>
             ))}
           </select>
         </div>
         <div>
-          <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-2 block ml-1">
-            Scraping Timeframe
-          </label>
+          <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-2 block ml-1">Scraping Timeframe</label>
           <select 
             value={timeFrame}
             onChange={(e) => setTimeFrame(e.target.value)}
@@ -251,7 +235,7 @@ export default function ScraperTab() {
       <div className="flex gap-4 items-center flex-wrap">
         <button 
           onClick={handleScrape} 
-          disabled={loading || isProcessing || selectedCategory !== "crime"} 
+          disabled={loading || isProcessing || isInteropCategory} 
           className="bg-white text-black px-8 py-3 rounded-full font-bold hover:bg-zinc-200 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {loading ? "Initialising..." : "Activate Scraper"}
@@ -288,46 +272,24 @@ export default function ScraperTab() {
         <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-500">
           <h3 className="text-zinc-400 font-bold uppercase text-xs tracking-widest flex items-center gap-2">
             Articles Scraped ({scrapedArticles.length}/{fullScrapedArticles.length})
-            {scrapedArticles.length < fullScrapedArticles.length && (
-              <span className="text-emerald-500 lowercase font-mono">...downloading</span>
-            )}
+            {scrapedArticles.length < fullScrapedArticles.length && <span className="text-emerald-500 lowercase font-mono">...downloading</span>}
           </h3>
           <div className="grid gap-3 max-h-125 overflow-y-auto custom-scrollbar pr-2">
             {scrapedArticles.map((art, i) => {
-              const title = art.file_key 
-                ? art.file_key.replace("news/", "").replace(".txt", "").replace("_", " ")
-                : "Untitled Report";
-              
-              const publishDate = art.metadata?.publish_date 
-                ? new Date(art.metadata.publish_date).toLocaleDateString('en-AU', {
-                    day: 'numeric', month: 'short', year: 'numeric'
-                  })
-                : "Date Unknown";
-
-              const preview = art.content 
-                ? art.content.substring(0, 140).trim() + "..."
-                : "No preview available.";
+              const title = art.file_key ? art.file_key.replace("news/", "").replace(".txt", "").replace("_", " ") : "Untitled Report";
+              const publishDate = art.metadata?.publish_date ? new Date(art.metadata.publish_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) : "Date Unknown";
+              const preview = art.content ? art.content.substring(0, 140).trim() + "..." : "No preview available.";
 
               return (
-                <div 
-                  key={i} 
-                  className="p-5 bg-zinc-900/50 border border-zinc-800 rounded-2xl flex flex-col group hover:border-indigo-500/50 transition-all animate-in fade-in slide-in-from-left-2 duration-300"
-                >
+                <div key={i} className="p-5 bg-zinc-900/50 border border-zinc-800 rounded-2xl flex flex-col group hover:border-indigo-500/50 transition-all animate-in fade-in slide-in-from-left-2 duration-300">
                   <div className="flex justify-between items-start mb-2">
                     <div>
                       <h4 className="text-white font-semibold group-hover:text-indigo-400 transition-colors capitalize">{title}</h4>
                       <p className="text-[10px] uppercase tracking-widest text-zinc-500 mt-1">S3 Bucket Extractor • {publishDate}</p>
                     </div>
-                    <button 
-                      onClick={() => setSelectedArticle(art)}
-                      className="text-indigo-400 text-xs font-bold hover:underline shrink-0 ml-4 bg-indigo-500/10 px-3 py-1.5 rounded-full"
-                    >
-                      View Report
-                    </button>
+                    <button onClick={() => setSelectedArticle(art)} className="text-indigo-400 text-xs font-bold hover:underline shrink-0 ml-4 bg-indigo-500/10 px-3 py-1.5 rounded-full">View Report</button>
                   </div>
-                  <p className="text-sm text-zinc-400 leading-relaxed mt-2 line-clamp-2">
-                    {preview}
-                  </p>
+                  <p className="text-sm text-zinc-400 leading-relaxed mt-2 line-clamp-2">{preview}</p>
                 </div>
               );
             })}
@@ -336,74 +298,28 @@ export default function ScraperTab() {
         </div>
       )}
 
-      {/* The Reading Modal */}
+      {/* Reading Modal */}
       {selectedArticle && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-6 max-w-3xl w-full max-h-[80vh] flex flex-col shadow-2xl">
             <div className="flex justify-between items-center mb-4 border-b border-zinc-800 pb-4">
-              <h3 className="text-2xl font-bold text-white capitalize">
-                {selectedArticle.file_key?.replace("news/", "").replace(".txt", "").replace("_", " ") || "Article Viewer"}
-              </h3>
-              <button 
-                onClick={() => setSelectedArticle(null)} 
-                className="text-zinc-500 hover:text-white font-bold text-xl px-2"
-              >
-                ✕
-              </button>
+              <h3 className="text-2xl font-bold text-white capitalize">{selectedArticle.file_key?.replace("news/", "").replace(".txt", "").replace("_", " ") || "Article Viewer"}</h3>
+              <button onClick={() => setSelectedArticle(null)} className="text-zinc-500 hover:text-white font-bold text-xl px-2">✕</button>
             </div>
-            <div className="overflow-y-auto custom-scrollbar text-zinc-300 text-sm leading-relaxed whitespace-pre-wrap pr-4">
-              {selectedArticle.content || "No content available."}
-            </div>
+            <div className="overflow-y-auto custom-scrollbar text-zinc-300 text-sm leading-relaxed whitespace-pre-wrap pr-4">{selectedArticle.content || "No content available."}</div>
           </div>
         </div>
       )}
 
-      {isFallback && !isProcessing && visibleFallbackUrls.length > 0 && (
-        <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-500">
-          <h3 className="text-zinc-400 font-bold uppercase text-xs tracking-widest flex items-center gap-2">
-            Scraped News Articles
-            {visibleFallbackUrls.length < fullFallbackUrls.length && (
-              <span className="text-emerald-500 lowercase font-mono">...downloading</span>
-            )}
-          </h3>
-          <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-4 max-h-100 overflow-y-auto space-y-2 custom-scrollbar shadow-inner relative">
-            {visibleFallbackUrls.map((url, i) => (
-              <div key={i} className="p-2 bg-zinc-900/40 rounded text-[10px] md:text-xs font-mono text-zinc-500 truncate hover:text-emerald-400 hover:bg-zinc-900 transition-colors cursor-crosshair animate-in fade-in slide-in-from-left-2 duration-300">
-                <span className="text-zinc-700 mr-2">[{String(i + 1).padStart(2, '0')}]</span>
-                {url}
-              </div>
-            ))}
-            {visibleFallbackUrls.length < fullFallbackUrls.length && (
-              <div className="h-4 w-2 bg-emerald-500 animate-pulse mt-2 ml-2 inline-block" />
-            )}
-            <div ref={terminalEndRef} />
-          </div>
-        </div>
-      )}
-
-      {/* Pipeline Processing Status */}
+      {/* Pipeline Status */}
       {isProcessing && (
         <div className="space-y-4 animate-in fade-in zoom-in-95 duration-500">
           <h3 className="text-zinc-400 font-bold uppercase text-xs tracking-widest">Pipeline Status</h3>
           <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-6 font-mono text-sm space-y-4 shadow-inner">
             <div className="text-zinc-600">[System] Initialising data collection microservice...</div>
-            {processStep >= 1 && (
-              <div className={`flex items-center gap-3 animate-in slide-in-from-left-2 duration-300 ${processStep >= 2 ? "text-zinc-400" : "text-yellow-400 animate-pulse"}`}>
-                <span className="text-lg">{processStep >= 2 ? "✅" : "⏳"}</span>
-                <span>Parsing BOSCAR DATA...</span>
-              </div>
-            )}
-            {processStep >= 2 && (
-              <div className={`flex items-center gap-3 animate-in slide-in-from-left-2 duration-300 ${processStep >= 3 ? "text-zinc-400" : "text-yellow-400 animate-pulse"}`}>
-                <span className="text-lg">{processStep >= 3 ? "✅" : "⏳"}</span>
-                <span>Uploading to S3...</span>
-              </div>
-            )}
-            {processStep >= 3 && (
-              <div className="text-emerald-500 font-bold mt-6 pt-4 border-t border-zinc-800/50 animate-in fade-in duration-500">
-                [Success] Intelligence compilation complete. Data is ready for geographic mapping.
-              </div>
-            )}
+            {processStep >= 1 && <div className={`flex items-center gap-3 animate-in slide-in-from-left-2 duration-300 ${processStep >= 2 ? "text-zinc-400" : "text-yellow-400 animate-pulse"}`}><span>{processStep >= 2 ? "✅" : "⏳"}</span><span>Parsing BOSCAR DATA...</span></div>}
+            {processStep >= 2 && <div className={`flex items-center gap-3 animate-in slide-in-from-left-2 duration-300 ${processStep >= 3 ? "text-zinc-400" : "text-yellow-400 animate-pulse"}`}><span>{processStep >= 3 ? "✅" : "⏳"}</span><span>Uploading to S3...</span></div>}
+            {processStep >= 3 && <div className="text-emerald-500 font-bold mt-6 pt-4 border-t border-zinc-800/50 animate-in fade-in duration-500">[Success] Intelligence compilation complete. Data is ready for geographic mapping.</div>}
           </div>
         </div>
       )}
