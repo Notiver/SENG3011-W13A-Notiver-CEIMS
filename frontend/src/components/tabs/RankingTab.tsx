@@ -18,9 +18,15 @@ export default function RankingTab() {
   useEffect(() => {
     const fetchRankingData = async () => {
       try {
-        const { lgas } = await api.getAllLgas();
+        console.log("1. Requesting LGAs from API...");
+        const response = await api.getAllLgas();
+        console.log("2. LGA Response received:", response);
         
-        // Fetch stats and yearly trend for EACH LGA concurrently
+        const lgas = response.lgas || [];
+        if (lgas.length === 0) {
+           console.warn("API returned empty LGA list!");
+        }
+
         const statsPromises = lgas.map(async (lga: string) => {
           try {
             const stats = await api.getLgaStats(lga);
@@ -28,7 +34,6 @@ export default function RankingTab() {
             
             let trend = "stable";
             
-            // Calculate trend based on live yearly data api!! 
             if (yearly && yearly.length >= 2) {
               const sortedYears = yearly.sort((a: any, b: any) => b.year - a.year);
               const latestTotal = sortedYears[0].total;
@@ -44,7 +49,7 @@ export default function RankingTab() {
               trend: trend, 
             };
           } catch (e) {
-            console.warn(`Failed to fetch data for ${lga}`);
+            console.warn(`Failed to fetch data for ${lga}:`, e);
             return null;
           }
         });
@@ -55,9 +60,11 @@ export default function RankingTab() {
           .filter((item) => item !== null)
           .sort((a: any, b: any) => b.score - a.score) as RankingItem[];
 
+        console.log("3. Final Formatted Data ready for table:", formattedData);
         setRankingData(formattedData);
+
       } catch (error) {
-        console.error("Failed to load ranking data:", error);
+        console.error("FATAL ERROR loading ranking data:", error);
       } finally {
         setLoading(false);
       }
@@ -87,7 +94,7 @@ export default function RankingTab() {
 
       <div className="bg-zinc-900/50 border border-zinc-800 p-6 rounded-3xl shadow-xl">
         <h3 className="text-zinc-400 font-bold uppercase text-xs tracking-widest mb-6">Threat Score Trend (2019 - 2024)</h3>
-        <div className="min-h-75 w-full">
+        <div className="h-100 w-full"> 
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={MOCK_CHART_DATA} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />

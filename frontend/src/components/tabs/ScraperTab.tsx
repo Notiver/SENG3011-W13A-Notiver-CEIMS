@@ -34,7 +34,7 @@ export default function ScraperTab() {
     }
   }, [visibleFallbackUrls]);
 
-  const handleScrape = async () => {
+const handleScrape = async () => {
     setLoading(true);
     setIsFallback(false);
     setIsProcessing(false);
@@ -44,13 +44,9 @@ export default function ScraperTab() {
     setFullFallbackUrls([]);    
     
     await new Promise(resolve => setTimeout(resolve, 500));
-    const API_BASE = process.env.NEXT_PUBLIC_API_GATEWAY_URL_FETCH_ARTICLES;
 
     try {
-      const response = await fetch(`${API_BASE}/data-collection/collect-articles`);
-      if (!response.ok) throw new Error(`Service Error: ${response.status}`);
-      
-      const data = await response.json();
+      const data = await api.collectArticles();
       setScrapedArticles(data.articles || data); 
 
     } catch (error) {
