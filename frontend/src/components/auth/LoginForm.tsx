@@ -1,6 +1,6 @@
-"use client";
 
 import { useState } from "react";
+import { signIn } from "aws-amplify/auth";
 
 interface LoginFormProps {
   onLogin: () => void;
@@ -11,16 +11,36 @@ export default function LoginForm({ onLogin }: LoginFormProps) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
-  const handleLogin = () => {
-    // Keeping your original mock authentication logic
-    if (!email.toLowerCase().startsWith("j")) {
-      setError("Incorrect email or password, please check credentials");
-      return;
+  // real
+  const handleLogin = async () => {
+    try {
+      const { isSignedIn } = await signIn({ 
+        username: email, 
+        password: password 
+      });
+      
+      if (isSignedIn) {
+        setTimeout(() => {
+          onLogin();
+        }, 100);
+      }
+    } catch (err: any) {
+      console.error('Login error:', err);
+      setError(err.message || "An error occurred during login");
     }
-
-    setError("");
-    onLogin();
   };
+
+  // === mock ===
+  // const handleLogin = () => {
+  //   // Keeping your original mock authentication logic
+  //   if (!email.toLowerCase().startsWith("j")) {
+  //     setError("Incorrect email or password, please check credentials");
+  //     return;
+  //   }
+
+  //   setError("");
+  //   onLogin();
+  // };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#09090b] text-white">
