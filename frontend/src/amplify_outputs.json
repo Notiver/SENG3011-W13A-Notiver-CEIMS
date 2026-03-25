@@ -1,0 +1,9 @@
+{
+  "auth": {
+    "user_pool_id": "ap-southeast-2_vjIRHY3ZZ",
+    "aws_region": "ap-southeast-2",
+    "user_pool_client_id": "6voqf7i5ejvnivd7h580marfdm",
+    "standard_required_attributes": ["email"]
+  },
+  "version": "1"
+}
