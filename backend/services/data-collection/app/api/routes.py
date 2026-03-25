@@ -1,11 +1,21 @@
 import io
+import os
 from fastapi import APIRouter, HTTPException, UploadFile, File
+from pydantic import BaseModel # <-- NEW: Needed to read the frontend data
 from app.services.process_excel import process_data
 from app.database.s3 import upload_fileobj_to_s3, collect_data_url
 from app import config
 from app.services.article_manager import execute_full_collection, fetch_collection_status
+from app.services.scraper_v2 import run_dynamic_scraper
 
 router = APIRouter()
+
+# Interface type for scraper param
+class ScrapeRequest(BaseModel):
+    location: str
+    timeFrame: str
+    category: str
+
 
 @router.get("/")
 def root():
@@ -41,3 +51,17 @@ def post_articles():
 @router.get("/collect-articles")
 def get_articles():
     return fetch_collection_status()
+
+@router.post("/collect-articles")
+def post_dynamic_articles(request: ScrapeRequest):
+    try:
+        results = run_dynamic_scraper(
+            location=request.location,
+            time_frame=request.timeFrame,
+            category=request.category
+        )
+        
+        return {"status": "success", "count": len(results), "articles": results}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

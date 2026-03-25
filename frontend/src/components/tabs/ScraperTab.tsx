@@ -70,10 +70,15 @@ export default function ScraperTab() {
     await new Promise(resolve => setTimeout(resolve, 500));
 
     try {
-      const data = await api.collectArticles();
-      setFullScrapedArticles(data.articles || data); 
+      const data = await api.collectArticles({ 
+        category: selectedCategory, 
+        location: location, 
+        timeFrame: timeFrame
+      });
+      setFullScrapedArticles(data.articles || data);
 
     } catch (error) {
+      
       console.error("Scraper Error - Initiating Fallback Override:", error);
       try {
         const res = await fetch("/demo/scraped_links.txt");
