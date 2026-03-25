@@ -1,14 +1,29 @@
 import io
 import os
-from fastapi import APIRouter, HTTPException, UploadFile, File
-from pydantic import BaseModel # <-- NEW: Needed to read the frontend data
+from fastapi import APIRouter, HTTPException, UploadFile, File, Request
+from pydantic import BaseModel
 from app.services.process_excel import process_data
 from app.database.s3 import upload_fileobj_to_s3, collect_data_url
 from app import config
 from app.services.article_manager import execute_full_collection, fetch_collection_status
 from app.services.scraper_v2 import run_dynamic_scraper
+import json
+import base64
 
 router = APIRouter()
+
+def get_user_id(request: Request) -> str:
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or "Bearer " not in auth_header:
+        return "guest_user"
+    try:
+        token = auth_header.split(" ")[1]
+        payload_part = token.split(".")[1]
+        decoded_payload = base64.b64decode(payload_part + "==").decode("utf-8")
+        payload_json = json.loads(decoded_payload)
+        return payload_json.get("username") or payload_json.get("sub") or "guest_user"
+    except Exception:
+        return "guest_user"
 
 # Interface type for scraper param
 class ScrapeRequest(BaseModel):
@@ -53,15 +68,23 @@ def get_articles():
     return fetch_collection_status()
 
 @router.post("/collect-articles")
-def post_dynamic_articles(request: ScrapeRequest):
+def post_dynamic_articles(request: ScrapeRequest, fast_request: Request):
+    user_id = get_user_id(fast_request) 
+    
     try:
         results = run_dynamic_scraper(
             location=request.location,
             time_frame=request.timeFrame,
-            category=request.category
+            category=request.category,
+            user_id=user_id
         )
         
-        return {"status": "success", "count": len(results), "articles": results}
+        return {
+            "status": "success", 
+            "user_id": user_id, 
+            "count": len(results), 
+            "articles": results
+        }
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

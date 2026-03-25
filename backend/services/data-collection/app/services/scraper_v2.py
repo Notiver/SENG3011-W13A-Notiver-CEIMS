@@ -4,8 +4,8 @@ import boto3
 import random
 import os
 from datetime import datetime
+from app import config
 
-# Map the frontend categories to Guardian search keywords
 CATEGORY_MAP = {
     "crime": "(police OR crime OR murder OR theft)",
     "housing": "(housing OR real estate OR property prices OR rent)",
@@ -17,17 +17,22 @@ CATEGORY_MAP = {
     "climate": "(climate change OR environment OR emissions)"
 }
 
-def run_dynamic_scraper(location: str, time_frame: str, category: str):
-    print(f"Starting dynamic scrape for: {location}, {category}, {time_frame}")
+def run_dynamic_scraper(location: str, time_frame: str, category: str, user_id: str = "guest_user"):
+    """
+    Fetches article URLs based on user parameters and scrapes content 
+    directly into a user-specific S3 folder.
+    """
+    print(f"Starting dynamic scrape for User: {user_id} | Loc: {location} | Cat: {category}")
     
+    # 1. Build Query
     keywords = CATEGORY_MAP.get(category, category)
     search_query = f'"{location}" AND {keywords}'
     
     current_year = datetime.now().year
     start_year = current_year
-    end_year = current_year
     page_size = 1
     
+    # Logic for timeframe parameters
     if time_frame == "1_per_month_5_years":
         start_year = current_year - 4
         page_size = 1
@@ -42,8 +47,7 @@ def run_dynamic_scraper(location: str, time_frame: str, category: str):
     api_key = os.getenv("GUARDIAN_API_KEY", "test")    
     article_urls = []
     
-    # Fetch the URLs
-    for year in range(start_year, end_year + 1):
+    for year in range(start_year, current_year + 1):
         params = {
             "q": search_query,
             "section": "australia-news",      
@@ -60,14 +64,17 @@ def run_dynamic_scraper(location: str, time_frame: str, category: str):
                 for item in results:
                     article_urls.append(item.get('webUrl'))
         except Exception as e:
-            print(f"Guardian API Request failed: {e}")
+            print(f"Guardian API Request failed for {year}: {e}")
 
     print(f"Found {len(article_urls)} URLs. Scraping content...")
 
-    # Scrape Text and Upload to S3
-    s3 = boto3.client('s3', region_name=os.getenv("AWS_DEFAULT_REGION", "ap-southeast-2"))
-    bucket_name = os.getenv("S3_BUCKET_NAME", "your-fallback-bucket-name")
-    
+
+    try:
+        session = boto3.Session(profile_name=config.PROFILE_NAME)
+        s3 = session.client('s3', region_name=config.REGION)
+    except Exception:
+        s3 = boto3.client('s3', region_name=config.REGION)
+
     scraped_data = []
 
     for i, article_url in enumerate(article_urls):
@@ -79,17 +86,20 @@ def run_dynamic_scraper(location: str, time_frame: str, category: str):
             
             if content:
                 safe_cat = category.replace(" ", "_")
-                s3_key = f"news/{safe_cat}_{year}_{i}.txt"
+                s3_key = f"users/{user_id}/{config.NEWS_BUCKET_NAME}/{safe_cat}_{i}.txt"
                 
-                # Upload to S3
-                s3.put_object(Bucket=bucket_name, Key=s3_key, Body=content)
+                s3.put_object(
+                    Bucket=config.S3_BUCKET_NAME, 
+                    Key=s3_key, 
+                    Body=content,
+                    ContentType='text/plain'
+                )
                 
-                # Save metadata to return to the frontend
                 scraped_data.append({
                     "file_key": s3_key,
                     "url": article_url,
                     "content": content,
-                    "metadata": {"publish_date": f"{year}-01-01"}
+                    "metadata": {"publish_date": datetime.now().isoformat()}
                 })
         except Exception as e:
             print(f"Failed to process {article_url}: {e}")
