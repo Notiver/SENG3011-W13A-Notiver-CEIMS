@@ -57,10 +57,63 @@
             }
         },
         {
+            "type": "metric",
+            "properties": {
+                "title": "Slow Responses",
+                "metrics": [
+                    ["Notiver", "SlowResponses", "service", "data-collection"],
+                    ["Notiver", "SlowResponses", "service", "data-retrieval"],
+                    ["Notiver", "SlowResponses", "service", "data-processing"]
+                ],
+                "period": 300,
+                "stat": "Sum",
+                "view": "timeSeries"
+            }
+        },
+        {
             "type": "log",
             "properties": {
                 "title": "Recent Errors",
                 "query": "fields @timestamp, @message | filter @message like /ERROR/ or level = \"ERROR\" | sort @timestamp desc | limit 20",
+                "logGroupNames": [
+                    "/aws/lambda/data-collection-function",
+                    "/aws/lambda/data-retrieval-function",
+                    "/aws/lambda/data-nlp-analytics"
+                ],
+                "view": "table"
+            }
+        },
+        {
+            "type": "log",
+            "properties": {
+                "title": "Request Count by Endpoint",
+                "query": "fields endpoint | stats count(*) as requests by endpoint | sort requests desc",
+                "logGroupNames": [
+                    "/aws/lambda/data-collection-function",
+                    "/aws/lambda/data-retrieval-function",
+                    "/aws/lambda/data-nlp-analytics"
+                ],
+                "view": "table"
+            }
+        },
+        {
+            "type": "log",
+            "properties": {
+                "title": "Average Response Time by Endpoint",
+                "query": "fields endpoint, duration_ms | stats avg(duration_ms) as avg_ms by endpoint | sort avg_ms desc",
+                "logGroupNames": [
+                    "/aws/lambda/data-collection-function",
+                    "/aws/lambda/data-retrieval-function",
+                    "/aws/lambda/data-nlp-analytics"
+                ],
+                "view": "table"
+            }
+        },
+        {
+            "type": "log",
+            "properties": {
+                "title": "Top Callers by IP",
+                "query": "fields caller_ip | stats count(*) as requests by caller_ip | sort requests desc | limit 10",
                 "logGroupNames": [
                     "/aws/lambda/data-collection-function",
                     "/aws/lambda/data-retrieval-function",
