@@ -60,7 +60,7 @@
             "type": "log",
             "properties": {
                 "title": "Recent Errors",
-                "query": "fields @timestamp, @message, | filter @message like /ERROR/ or level = \"ERROR\" | sort @timestamp desc | limit 20",
+                "query": "fields @timestamp, @message | filter @message like /ERROR/ or level = \"ERROR\" | sort @timestamp desc | limit 20",
                 "logGroupNames": [
                     "/aws/lambda/data-collection-function",
                     "/aws/lambda/data-retrieval-function",

@@ -10,6 +10,7 @@ def create_alarms():
     ]
 
     for function_name in functions:
+        # high error alarm
         cloudwatch.put_metric_alarm(
             AlarmName=f'{function_name}-high-errors',
             MetricName='Errors',
@@ -18,6 +19,32 @@ def create_alarms():
             Period=300,
             EvaluationPeriods=2,
             Threshold=10,
+            ComparisonOperator='GreaterThanThreshold',
+            Statistic='Sum'
+        )
+
+        # high duration alarm
+        cloudwatch.put_metric_alarm(
+            AlarmName=f'{function_name}-high-duration',
+            MetricName='Duration',
+            Namespace='AWS/Lambda',
+            Dimensions=[{'Name': 'FunctionName', 'Value': function_name}],
+            Period=300,
+            EvaluationPeriods=2,
+            Threshold=25000,
+            ComparisonOperator='GreaterThanThreshold',
+            Statistic='Average'
+        )
+
+        # throttle alarm
+        cloudwatch.put_metric_alarm(
+            AlarmName=f'{function_name}-throttles',
+            MetricName='Throttles',
+            Namespace='AWS/Lambda',
+            Dimensions=[{'Name': 'FunctionName', 'Value': function_name}],
+            Period=300,
+            EvaluationPeriods=1,
+            Threshold=5,
             ComparisonOperator='GreaterThanThreshold',
             Statistic='Sum'
         )
