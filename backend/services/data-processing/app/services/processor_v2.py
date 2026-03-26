@@ -1,7 +1,6 @@
 import boto3
 import json
 import requests
-import os
 from datetime import datetime
 from transformers import pipeline
 

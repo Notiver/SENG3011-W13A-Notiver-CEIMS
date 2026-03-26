@@ -1,7 +1,6 @@
 import requests
 import newspaper
 import boto3
-import random
 import os
 from datetime import datetime
 from app import config

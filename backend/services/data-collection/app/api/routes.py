@@ -1,5 +1,4 @@
 import io
-import os
 from fastapi import APIRouter, HTTPException, UploadFile, File, Request
 from pydantic import BaseModel
 from app.services.process_excel import process_data
