@@ -4,7 +4,7 @@ import json
 import base64
 from pydantic import BaseModel
 from app import config 
-from app.services.processor import run_nlp_pipeline, fetch_processed_data
+from app.services.processor import run_nlp_pipeline
 router = APIRouter()
 
 class ScrapeRequest(BaseModel):
