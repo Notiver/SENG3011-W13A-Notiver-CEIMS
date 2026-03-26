@@ -12,7 +12,7 @@ import outputs from '@/amplify_outputs.json';
 
 Amplify.configure(outputs);
 
-export default function DemoPage() {
+export default function MainPage() {
   const [activeTab, setActiveTab] = useState("scraper");
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);

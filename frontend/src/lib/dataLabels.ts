@@ -26,9 +26,16 @@ export const MOCK_RANKING = [
   { lga: "Ku-ring-gai", score: 8, trend: "down" },
 ];
 
-export const CATEGORIES = [
-  { name: "crime", description: "Insights on Crime Articles related to LGA" },
-  { name: "housing prices", description: "Investigates headlines about Property Prices" },
-  { name: "lifestyle", description: "Distinguishes news trends for health and lifestyle in LGA" },
-  { name: "job opportunities", description: "Heatmaps news of Job Oppurtunities" },
+export const CEIMS_CATEGORIES = [
+  { id: "crime", name: "Crime", description: "Incident reports and trends" },
+  { id: "housing", name: "Housing Prices", description: "Real estate and rental markets" },
+  { id: "lifestyle", name: "Lifestyle", description: "Local events and community news" },
+  { id: "jobs", name: "Job Opportunities", description: "Employment and market growth" }
+];
+
+export const INTEROP_CATEGORIES = [
+  { id: "stocks", name: "Stocks & Finance", description: "Market indices and company news" },
+  { id: "weather", name: "Weather", description: "Meteorological data and alerts" },
+  { id: "geopolitics", name: "Geopolitics", description: "International relations and policy" },
+  { id: "climate", name: "Climate", description: "Environmental studies and shifts" }
 ];
