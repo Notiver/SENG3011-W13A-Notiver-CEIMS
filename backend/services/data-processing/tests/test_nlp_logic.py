@@ -1,6 +1,5 @@
+import pytest
 from unittest.mock import patch
-
-
 from utils.crime_classifier import classify_crime 
 from utils.location_classifier import get_location_metadata
 
@@ -18,20 +17,26 @@ class TestCrimeClassifier:
         assert classify_crime(text) == "General Crime"
 
 class TestLocationMetadata:
-    @patch('utils.location_classifier.suburb_data', {"Redfern": {"councilname": "City Of Sydney", "postcode": "2016"}})
-    @patch('utils.location_classifier.sorted_suburbs', ["Redfern"])
-    def test_get_location_metadata_match(self, mock_suburbs, mock_data):
-        text = "A major event happened in Redfern today."
-        result = get_location_metadata(text)
+    
+    def test_get_location_metadata_match(self):
+        mock_data = {"Redfern": {"councilname": "City Of Sydney", "postcode": "2016"}}
+        mock_subs = ["Redfern"]
         
-        assert result["suburb"] == "Redfern"
-        assert result["lga"] == "City Of Sydney"
-        assert str(result["postcode"]) == "2016"
+        with patch('utils.location_classifier.suburb_data', mock_data):
+            with patch('utils.location_classifier.sorted_suburbs', mock_subs):
+                text = "A major event happened in Redfern today."
+                result = get_location_metadata(text)
+                
+                assert result["suburb"] == "Redfern"
+                assert result["lga"] == "City Of Sydney"
+                assert str(result["postcode"]) == "2016"
 
-    @patch('utils.location_classifier.sorted_suburbs', ["Redfern"])
-    def test_get_location_metadata_no_match(self, mock_suburbs):
-        text = "A major event happened in Melbourne today."
-        result = get_location_metadata(text)
+    def test_get_location_metadata_no_match(self):
+        mock_subs = ["Redfern"]
         
-        assert result["suburb"] == "NSW General"
-        assert result["lga"] == "Unknown"
+        with patch('utils.location_classifier.sorted_suburbs', mock_subs):
+            text = "A major event happened in Melbourne today."
+            result = get_location_metadata(text)
+            
+            assert result["suburb"] == "NSW General"
+            assert result["lga"] == "Unknown"
