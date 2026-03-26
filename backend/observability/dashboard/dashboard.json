@@ -1,0 +1,73 @@
+{
+    "widgets": [
+        {
+            "type": "metric",
+            "properties": {
+                "title": "Request Count by Service",
+                "metrics": [
+                    ["Notiver", "APIRequests", "service", "data-collection"],
+                    ["Notiver", "APIRequests", "service", "data-retrieval"],
+                    ["Notiver", "APIRequests", "service", "data-processing"]
+                ],
+                "period": 300,
+                "stat": "Sum",
+                "view": "timeSeries"
+            }
+        },
+        {
+            "type": "metric",
+            "properties": {
+                "title": "Error Count",
+                "metrics": [
+                    ["Notiver", "Errors", "service", "data-collection"],
+                    ["Notiver", "Errors", "service", "data-retrieval"],
+                    ["Notiver", "Errors", "service", "data-processing"]
+                ],
+                "period": 300,
+                "stat": "Sum",
+                "view": "timeSeries"
+            }
+        },
+        {
+            "type": "metric",
+            "properties": {
+                "title": "Response Time",
+                "metrics": [
+                    ["Notiver", "Latency", "service", "data-collection"],
+                    ["Notiver", "Latency", "service", "data-retrieval"],
+                    ["Notiver", "Latency", "service", "data-processing"]
+                ],
+                "period": 300,
+                "stat": "Average",
+                "view": "timeSeries"
+            }
+        },
+        {
+            "type": "metric",
+            "properties": {
+                "title": "Lambda Duration",
+                "metrics": [
+                    ["AWS/Lambda", "Duration", "FunctionName", "data-collection-function"],
+                    ["AWS/Lambda", "Duration", "FunctionName", "data-retrieval-function"],
+                    ["AWS/Lambda", "Duration", "FunctionName", "data-nlp-analytics"]
+                ],
+                "period": 300,
+                "stat": "Average",
+                "view": "timeSeries"
+            }
+        },
+        {
+            "type": "log",
+            "properties": {
+                "title": "Recent Errors",
+                "query": "fields @timestamp, @message, | filter @message like /ERROR/ or level = \"ERROR\" | sort @timestamp desc | limit 20",
+                "logGroupNames": [
+                    "/aws/lambda/data-collection-function",
+                    "/aws/lambda/data-retrieval-function",
+                    "/aws/lambda/data-nlp-analytics"
+                ],
+                "view": "table"
+            }
+        }
+    ]
+}

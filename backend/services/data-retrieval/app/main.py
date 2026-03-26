@@ -5,5 +5,6 @@ from observability.middleware.logging_middleware import observability_middleware
 
 app = FastAPI(title="Notiver Retrieval API", root_path="/data-retrieval")
 app.middleware("http")(observability_middleware)
+metrics.set_default_dimensions(service="data-retrieval")
 app.include_router(router)
 handler = Mangum(app)

@@ -6,7 +6,7 @@ from aws_lambda_powertools.metrics import MetricUnit
 logger = Logger(service="notiver")
 metrics = Metrics(namespace="Notiver", service="notiver")
 
-_start_time = time.time()
+start_time = time.time()
 
 async def observability_middleware(request: Request, call_next):
     start = time.time()
@@ -25,7 +25,7 @@ async def observability_middleware(request: Request, call_next):
             "caller_ip": caller_ip,
             "status_code": response.status_code,
             "duration_ms": duration_ms,
-            "uptime_seconds": round(time.time() - _start_time, 2)
+            "uptime_seconds": round(time.time() - start_time, 2)
         })
 
         metrics.add_metric("APIRequests", MetricUnit.Count, 1)
