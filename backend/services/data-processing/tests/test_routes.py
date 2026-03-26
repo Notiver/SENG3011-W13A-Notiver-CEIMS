@@ -1,49 +1,77 @@
+import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import patch
-
+from unittest.mock import patch, MagicMock
 from app.main import app
 
 client = TestClient(app)
 
+
+# Generates a fake JWT header
+@pytest.fixture
+def auth_headers():
+    fake_token = "Bearer header.eyJ1c2VybmFtZSI6InRlc3RfamFuZSJ9.signature"
+    return {"Authorization": fake_token}
+
+@pytest.fixture
+def valid_payload():
+    return {
+        "location": "Sydney",
+        "timeFrame": "5_per_month_1_year",
+        "category": "crime"
+    }
+
 class TestProcessRoutes:
+
     def test_root_endpoint(self):
         response = client.get("/")
         assert response.status_code == 200
-        assert response.json() == {"message": "Data Processing Service is running"}
-
-    # Process articles TEST
-    @patch('app.api.routes.run_nlp_pipeline')
-    def test_process_articles_success(self, mock_pipeline):
-        mock_pipeline.return_value = {"status": "success", "processed": 5}
-        response = client.post("/process-articles")
-        
-        assert response.status_code == 200
-        assert response.json() == {"status": "success", "processed": 5}
-        mock_pipeline.assert_called_once()
+        data = response.json()
+        assert "Data Processing Service is running" in data["message"]
+        assert "target_bucket" in data
+        assert "region" in data
 
     @patch('app.api.routes.run_nlp_pipeline')
-    def test_process_articles_exception(self, mock_pipeline):
-        mock_pipeline.side_effect = Exception("Model failed to load")
-        response = client.post("/process-articles")
+    def test_process_articles_success(self, mock_pipeline, auth_headers, valid_payload):
+        """Tests successful NLP trigger with auth and valid body."""
+        mock_pipeline.return_value = {"processed": 5, "skipped": 0}
         
-        assert response.status_code == 500
-        assert "Pipeline error: Model failed to load" in response.json()["detail"]
-
-    # Fetch processed articles
-    @patch('app.api.routes.fetch_processed_data')
-    def test_get_processed_articles_success(self, mock_fetch):
-        mock_data = [{"id": 1, "lga": "Sydney", "sentiment": 0.5}]
-        mock_fetch.return_value = mock_data
-        
-        response = client.get("/processed-articles")
+        response = client.post(
+            "/process-articles", 
+            json=valid_payload, 
+            headers=auth_headers
+        )
         
         assert response.status_code == 200
-        assert response.json() == mock_data
+        assert "test_jane" in response.json()["message"]
+        assert "users/test_jane/" in response.json()["output_folder"]
 
-    @patch('app.api.routes.fetch_processed_data')
-    def test_get_processed_articles_not_found(self, mock_fetch):
-        mock_fetch.return_value = {"error": "No articles found in DB"}
-        response = client.get("/processed-articles")
+    @patch('app.api.routes.run_nlp_pipeline')
+    def test_process_articles_unauthorized(self, mock_pipeline, valid_payload):
+        """Verify it defaults to guest_user when no token is provided."""
+        mock_pipeline.return_value = {"processed": 1}
         
-        assert response.status_code == 404
-        assert response.json()["detail"] == "No articles found in DB"
+        response = client.post("/process-articles", json=valid_payload)
+        
+        assert response.status_code == 200
+        assert "guest_user" in response.json()["message"]
+
+    @patch('boto3.Session')
+    def test_get_processed_articles_empty_s3(self, mock_boto, auth_headers):
+        """Tests the retrieval route handles an empty S3 bucket gracefully."""
+        # Mock S3 list_objects_v2 to return no contents
+        mock_s3 = MagicMock()
+        mock_boto.return_value.client.return_value = mock_s3
+        mock_s3.list_objects_v2.return_value = {}
+        
+        response = client.get("/processed-articles", headers=auth_headers)
+        
+        assert response.status_code == 200
+        assert response.json()["articles"] == []
+        assert response.json()["user_id"] == "test_jane"
+
+    def test_process_articles_invalid_body(self, auth_headers):
+        """Tests that missing fields trigger a 422 (Pydantic validation)."""
+        bad_payload = {"location": "Sydney"}
+        response = client.post("/process-articles", json=bad_payload, headers=auth_headers)
+        
+        assert response.status_code == 422
