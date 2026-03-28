@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { api } from "@/lib/api";
 import { MAJOR_CITIES } from "@/lib/majorCities";
 import { CEIMS_CATEGORIES, INTEROP_CATEGORIES } from "@/lib/dataLabels";
-import { Maximize2, Minimize2 } from 'lucide-react';
+import { Maximize2, Minimize2, Download } from 'lucide-react';
 
 export default function ScraperTab() {
   const [loading, setLoading] = useState(false);
@@ -252,7 +252,7 @@ export default function ScraperTab() {
             onClick={handleDownload} 
             className="bg-transparent border border-zinc-700 text-zinc-300 px-6 py-3 rounded-full font-bold hover:bg-zinc-800 hover:text-white transition-all flex items-center gap-2 animate-in fade-in"
           >
-            <span className="text-lg">↓</span> Download URLs
+            <Download /> Download URLs
           </button>
         )}
 

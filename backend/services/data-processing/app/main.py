@@ -5,13 +5,18 @@ from fastapi.middleware.cors import CORSMiddleware
 
 
 app = FastAPI(title="Notiver NLP Processing API", root_path="/data-processing")
-app.include_router(router)
-handler = Mangum(app)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], 
+    allow_origins=[
+      "https://main.d2exnodyaugt1a.amplifyapp.com",
+      "http://localhost:3000"
+    ],
     allow_credentials=True,
     allow_methods=["*"], 
     allow_headers=["*"], 
 )
+
+app.include_router(router)
+handler = Mangum(app)
+
