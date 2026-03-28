@@ -71,6 +71,31 @@
             }
         },
         {
+            "type": "metric",
+            "properties": {
+                "title": "Spam Events",
+                "metrics": [
+                    ["Notiver", "SpamEvents", "service", "data-collection"],
+                    ["Notiver", "SpamEvents", "service", "data-processing"]
+                ],
+                "period": 300,
+                "stat": "Sum",
+                "view": "timeSeries"
+            }
+        },
+        {
+            "type": "metric",
+            "properties": {
+                "title": "Storage Events",
+                "metrics": [
+                    ["Notiver", "SpamEvents", "service", "data-collection"]
+                ],
+                "period": 300,
+                "stat": "Sum",
+                "view": "timeSeries"
+            }
+        },
+        {
             "type": "log",
             "properties": {
                 "title": "Recent Errors",
@@ -117,6 +142,18 @@
                 "logGroupNames": [
                     "/aws/lambda/data-collection-function",
                     "/aws/lambda/data-retrieval-function",
+                    "/aws/lambda/data-nlp-analytics"
+                ],
+                "view": "table"
+            }
+        },
+        {
+            "type": "log",
+            "properties": {
+                "title": "Spam Events",
+                "query": "fields @timestamp, caller_ip, endpoint, reason | filter event_type = \"spam\" | sort @timestamp desc | limit 20",
+                "logGroupNames": [
+                    "/aws/lambda/data-collection-function",
                     "/aws/lambda/data-nlp-analytics"
                 ],
                 "view": "table"

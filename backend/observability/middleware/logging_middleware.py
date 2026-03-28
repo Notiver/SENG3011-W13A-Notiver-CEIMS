@@ -60,3 +60,37 @@ async def observability_middleware(request: Request, call_next):
         metrics.flush_metrics()
 
         raise
+
+def log_storage_event(caller_ip: str, filename: str, size_bytes: int, bucket: str, action: str):
+    size_mb = round(size_bytes / 1024 / 1024, 2) if size_bytes else 0
+
+    logger.info("Storage event", extra={
+        "event_type": "storage",
+        "action": action,
+        "caller_ip": caller_ip,
+        "filename": filename,
+        "size_mb": size_mb,
+        "bucket": bucket
+    })
+
+    metrics.add_metric("StorageEvents", MetricUnit.Count, 1)
+
+    if size_bytes and size_bytes > 50 * 1024 * 1024:
+        logger.warning("Large file upload detected", extra={
+            "event_type": "spam_warming",
+            "caller_ip": caller_ip,
+            "filename": filename,
+            "size_mb": size_mb
+        })
+
+        metrics.add_metric("LargeFileWarnings", MetricUnit.Count, 1)
+
+def log_spam_event(caller_ip: str, reason: str, endpoint: str):
+    logger.warning("Spam detected", extra={
+        "event_type": "spam",
+        "caller_ip": caller_ip,
+        "reason": reason,
+        "endpoint": endpoint
+    })
+
+    metrics.add_metric("SpamEvents", MetricUnit.Count, 1)
