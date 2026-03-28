@@ -19,29 +19,56 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: python -m pip install pytest pytest-cov ruff weasyprint
+        run: python -m pip install pytest pytest-cov ruff weasyprint boto3 moto
 
       - name: Run linting
         run: ruff check .
 
-      - name: Run tests with coverage
-        run: pytest --html=report.html --cov=. --cov-report=term-missing --cov-report=html --self-contained-html
+      - name: Test Data Retrieval
+        working-directory: ./backend/services/data-retrieval
+        run: |
+          pip install -r requirements.txt
+          python -m pytest --html=../../retrieval_report.html --cov=. --cov-report=term-missing --cov-report=html:../../cov/retrieval --self-contained-html
+
+      - name: Test Data Collection
+        working-directory: ./backend/services/data-collection
+        run: |
+          # Only install/test if the files exist, preventing crashes!
+          if [ -f "requirements.txt" ]; then pip install -r requirements.txt; fi
+          if [ -d "tests" ]; then python -m pytest --html=../../collection_report.html --cov=. --cov-report=term-missing --cov-report=html:../../cov/collection --self-contained-html; fi
+
+      - name: Test Data Processing
+        working-directory: ./backend/services/data-processing
+        run: |
+          if [ -f "requirements.txt" ]; then pip install -r requirements.txt; fi
+          if [ -d "tests" ]; then python -m pytest --html=../../processing_report.html --cov=. --cov-report=term-missing --cov-report=html:../../cov/processing --self-contained-html; fi
 
       - name: Convert reports to PDF
         run: |
           python3 -c "
+          import os
           from weasyprint import HTML
-          HTML('report.html').write_pdf('test_report.pdf')
-          HTML('htmlcov/index.html').write_pdf('coverage_report.pdf')
+          report_map = {
+            'retrieval_report.html': 'retrieval_test_report.pdf',
+            'collection_report.html': 'collection_test_report.pdf',
+            'processing_report.html': 'processing_test_report.pdf',
+            'cov/retrieval/index.html': 'retrieval_coverage.pdf',
+            'cov/collection/index.html': 'collection_coverage.pdf',
+            'cov/processing/index.html': 'processing_coverage.pdf'
+          }
+          
+          for html_file, pdf_file in report_map.items():
+            if os.path.exists(html_file):
+              base = os.path.dirname(html_file) if '/' in html_file else None
+              HTML(filename=html_file, base_url=base).write_pdf(pdf_file)
           "
 
       - name: Upload reports
         uses: actions/upload-artifact@v4
         with:
           name: pipeline-reports
-          path: |
-            test_report.pdf
-            coverage_report.pdf
+          path: "*.pdf"
+  
   deploy:
     needs: test
     runs-on: ubuntu-latest
@@ -150,7 +177,13 @@ jobs:
           sed -i "s/\${AWS_ACCOUNT_ID}/${{ secrets.AWS_ACCOUNT_ID }}/g" backend/infrastructure/openapi.yaml
           
       - name: Deploy API Gateway
-              run: |
-                aws apigatewayv2 reimport-api \
-                  --api-id hbjyijsell \
-                  --body file://backend/infrastructure/openapi.yaml
+        run: |
+          aws apigatewayv2 reimport-api \
+            --api-id hbjyijsell \
+            --body file://backend/infrastructure/openapi.yaml
+
+      - name: Create API Deployment
+        run: |
+          aws apigatewayv2 create-deployment \
+            --api-id hbjyijsell \
+            --stage-name '$default'
