@@ -74,6 +74,7 @@ export default function ScraperTab() {
         location: location, 
         timeFrame: timeFrame
       });
+      console.log(data);
       setFullScrapedArticles(data.articles || data);
 
     } catch (error) {
