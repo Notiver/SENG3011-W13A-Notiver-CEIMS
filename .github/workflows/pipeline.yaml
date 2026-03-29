@@ -28,20 +28,20 @@ jobs:
         working-directory: ./backend/services/data-retrieval
         run: |
           pip install -r requirements.txt
-          python -m pytest --html=../../retrieval_report.html --cov=. --cov-report=term-missing --cov-report=html:../../cov/retrieval --self-contained-html
+          python -m pytest --html=../../../retrieval_report.html --cov=. --cov-report=term-missing --cov-report=html:../../../cov/retrieval --self-contained-html
 
       - name: Test Data Collection
         working-directory: ./backend/services/data-collection
         run: |
           # Only install/test if the files exist, preventing crashes!
           if [ -f "requirements.txt" ]; then pip install -r requirements.txt; fi
-          if [ -d "tests" ]; then python -m pytest --html=../../collection_report.html --cov=. --cov-report=term-missing --cov-report=html:../../cov/collection --self-contained-html; fi
+          if [ -d "tests" ]; then python -m pytest --html=../../../collection_report.html --cov=. --cov-report=term-missing --cov-report=html:../../../cov/collection --self-contained-html; fi
 
       - name: Test Data Processing
         working-directory: ./backend/services/data-processing
         run: |
           if [ -f "requirements.txt" ]; then pip install -r requirements.txt; fi
-          if [ -d "tests" ]; then python -m pytest --html=../../processing_report.html --cov=. --cov-report=term-missing --cov-report=html:../../cov/processing --self-contained-html; fi
+          if [ -d "tests" ]; then python -m pytest --html=../../../processing_report.html --cov=. --cov-report=term-missing --cov-report=html:../../../cov/processing --self-contained-html; fi
 
       - name: Convert reports to PDF
         run: |
