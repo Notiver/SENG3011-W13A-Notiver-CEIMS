@@ -57,6 +57,7 @@ jobs:
             'cov/processing/index.html': 'processing_coverage.pdf'
           }
           
+          print(os.getcwd())
           for html_file, pdf_file in report_map.items():
             if os.path.exists(html_file):
               print(f'File found: {html_file}')
