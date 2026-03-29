@@ -170,6 +170,10 @@ jobs:
             --api-id hbjyijsell \
             --stage-name '$default'
 
+      - name: Install observability dependencies
+        run: |
+          pip install -r backend/observability/requirements.txt
+          
       - name: Create/Update CloudWatch Dashboard
         run: |
           aws cloudwatch put-dashboard \
