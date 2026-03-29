@@ -11,4 +11,4 @@ S3_BUCKET_NAME = "nsw-crime-data-bucket"
 REGION = "ap-southeast-2"
 PROFILE_NAME = "notiver"
 
-API_URL = "https://wk63xsyoc7mta3rikpim7epa4m0waudh.lambda-url.ap-southeast-2.on.aws/".rstrip("/")
+API_URL = "https://hbjyijsell.execute-api.ap-southeast-2.amazonaws.com/".rstrip("/")
