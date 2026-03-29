@@ -166,3 +166,7 @@ jobs:
           aws apigatewayv2 create-deployment \
             --api-id hbjyijsell \
             --stage-name '$default'
+
+      - name: Install observability dependencies
+        run: |
+          pip install -r backend/observability/requirements.txt
