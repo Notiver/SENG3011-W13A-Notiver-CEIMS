@@ -4,6 +4,7 @@
             "type": "metric",
             "properties": {
                 "title": "Request Count by Service",
+                "region": "ap-southeast-2",
                 "metrics": [
                     ["Notiver", "APIRequests", "service", "data-collection"],
                     ["Notiver", "APIRequests", "service", "data-retrieval"],
@@ -18,6 +19,7 @@
             "type": "metric",
             "properties": {
                 "title": "Error Count",
+                "region": "ap-southeast-2",
                 "metrics": [
                     ["Notiver", "Errors", "service", "data-collection"],
                     ["Notiver", "Errors", "service", "data-retrieval"],
@@ -32,6 +34,7 @@
             "type": "metric",
             "properties": {
                 "title": "Response Time",
+                "region": "ap-southeast-2",
                 "metrics": [
                     ["Notiver", "Latency", "service", "data-collection"],
                     ["Notiver", "Latency", "service", "data-retrieval"],
@@ -46,6 +49,7 @@
             "type": "metric",
             "properties": {
                 "title": "Lambda Duration",
+                "region": "ap-southeast-2",
                 "metrics": [
                     ["AWS/Lambda", "Duration", "FunctionName", "data-collection-function"],
                     ["AWS/Lambda", "Duration", "FunctionName", "data-retrieval-function"],
@@ -60,6 +64,7 @@
             "type": "metric",
             "properties": {
                 "title": "Slow Responses",
+                "region": "ap-southeast-2",
                 "metrics": [
                     ["Notiver", "SlowResponses", "service", "data-collection"],
                     ["Notiver", "SlowResponses", "service", "data-retrieval"],
@@ -74,6 +79,7 @@
             "type": "metric",
             "properties": {
                 "title": "Spam Events",
+                "region": "ap-southeast-2",
                 "metrics": [
                     ["Notiver", "SpamEvents", "service", "data-collection"],
                     ["Notiver", "SpamEvents", "service", "data-processing"]
@@ -87,6 +93,7 @@
             "type": "metric",
             "properties": {
                 "title": "Storage Events",
+                "region": "ap-southeast-2",
                 "metrics": [
                     ["Notiver", "SpamEvents", "service", "data-collection"]
                 ],
