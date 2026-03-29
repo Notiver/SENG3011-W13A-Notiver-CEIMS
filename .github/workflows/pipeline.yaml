@@ -27,6 +27,7 @@ jobs:
       - name: Test Data Retrieval
         working-directory: ./backend/services/data-retrieval
         run: |
+          export PYTHONPATH=$PYTHONPATH:$(pwd)/../../
           pip install -r requirements.txt
           python -m pytest --cov=app --cov-report=term-missing
 
@@ -34,12 +35,14 @@ jobs:
         working-directory: ./backend/services/data-collection
         run: |
           # Only install/test if the files exist, preventing crashes!
+          export PYTHONPATH=$PYTHONPATH:$(pwd)/../../
           if [ -f "requirements.txt" ]; then pip install -r requirements.txt; fi
           if [ -d "tests" ]; then python -m pytest --cov=app --cov-report=term-missing; fi
 
       - name: Test Data Processing
         working-directory: ./backend/services/data-processing
         run: |
+          export PYTHONPATH=$PYTHONPATH:$(pwd)/../../
           if [ -f "requirements.txt" ]; then pip install -r requirements.txt; fi
           if [ -d "tests" ]; then python -m pytest --cov=app --cov-report=term-missing; fi
 
@@ -168,3 +171,17 @@ jobs:
           aws apigatewayv2 create-deployment \
             --api-id hbjyijsell \
             --stage-name '$default'
+
+      - name: Install observability dependencies
+        run: |
+          pip install -r backend/observability/requirements.txt
+          
+      - name: Create/Update CloudWatch Dashboard
+        run: |
+          aws cloudwatch put-dashboard \
+            --dashboard-name Notiver-Dashboard \
+            --dashboard-body file://backend/observability/dashboard/dashboard.json
+
+      - name: Create CloudWatch Alarms
+        run: |
+          python backend/observability/alerts/alarms.py
