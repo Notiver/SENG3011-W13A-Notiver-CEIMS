@@ -1,7 +1,6 @@
 import boto3
 import app.config as config
 import requests
-import sys
 
 from collections import defaultdict
 from utils.lga_format_dict import LGA_FORMAT_MAP
@@ -9,59 +8,85 @@ from utils.crime_dict import CRIME_CATEGORY_MAP, CRIME_WEIGHTS
 from utils.LGAData import get_lga_population
 from decimal import Decimal
 
-all_article_events = []
-article_events_by_year = defaultdict(list)
-all_lga_stats = []
-lga_stats_by_year = defaultdict(list)
+class PipelineError(Exception):
+    pass
+
+def get_dynamodb_resource():
+    """Function to initialize the resource."""
+    try:
+        session = boto3.Session(profile_name=config.PROFILE_NAME)
+        return session.resource('dynamodb', region_name=config.REGION)
+    except Exception:
+        return boto3.resource('dynamodb', region_name=config.REGION)
 
 
-# Connect to DynamoDB data
-try:
-    session = boto3.Session(profile_name=config.PROFILE_NAME)
-    dynamodb = session.resource('dynamodb', region_name=config.REGION)
-except Exception:
-    session = boto3.Session()
-    dynamodb = boto3.resource('dynamodb', region_name=config.REGION)
+def process_retrieval(dynamodb_resource=None):
+    if not dynamodb_resource:
+        dynamodb_resource = get_dynamodb_resource()
+    
+    lga_overall_table = dynamodb_resource.Table('lga-overall')
+    lga_by_year_table = dynamodb_resource.Table('lga-by-year')
 
-lga_overall_table = dynamodb.Table('lga-overall')
-lga_by_year_table = dynamodb.Table('lga-by-year')
+    # 1. Fetch data 
+    all_article_events, article_events_by_year = process_articles()
+    all_lga_stats, lga_stats_by_year = process_statistics()
 
-
-def process_retrieval():
-
-    process_articles()
-    process_statistics()
-
+    # 2. Process metrics
     lga_sentiment_scores_all = sentiment_scores(all_article_events)
-    lga_statistical_scores_all = stat_score(lga_aggregate(all_lga_stats))
-    lga_total_crimes = count_total_crimes(all_lga_stats)
+    
+    # Run the aggregate ONCE and save the dictionary
+    aggregated_stats = lga_aggregate(all_lga_stats)
+    
+    # Calculate statistical scores from the aggregated data
+    lga_statistical_scores_all = stat_score(aggregated_stats)
+    
+    # Extract total crimes directly from the aggregated data!
+    lga_total_crimes = {lga: stats["total_crimes"] for lga, stats in aggregated_stats.items()}
+    # -----------------------
+
     lga_total_articles = count_total_articles(all_article_events)
 
-    upload_lga_overall_data(lga_sentiment_scores_all, lga_statistical_scores_all, lga_total_crimes, lga_total_articles)
+    # 3. Upload data 
+    upload_lga_overall_data(
+        lga_sentiment_scores_all, 
+        lga_statistical_scores_all, 
+        lga_total_crimes, 
+        lga_total_articles, 
+        lga_overall_table
+    )
 
-    upload_lga_by_year_data()
+    upload_lga_by_year_data(
+        lga_stats_by_year, 
+        article_events_by_year, 
+        lga_by_year_table
+    )
 
 
 def process_articles():
+    all_article_events = []
+    article_events_by_year = defaultdict(list)
+
     url = config.API_URL + "/data-processing/processed-articles"
     response = requests.get(url)
 
     if response.status_code == 200:
         data = response.json()
         all_article_events.extend(data)
-
     else:
-        print(f"Error {response.status_code}: {response.reason}")
-        sys.exit(response.status_code)
+        # Replaced sys.exit() with an exception
+        raise PipelineError(f"Error {response.status_code}: {response.reason}")
 
     for event in all_article_events:
         year = event.get('when').split('-')[0]
         article_events_by_year[year].append(event)
 
-    return
+    return all_article_events, article_events_by_year
 
 
 def process_statistics():
+    all_lga_stats = []
+    lga_stats_by_year = defaultdict(list)
+
     url = config.API_URL + "/data-collection/collect-data"
     response = requests.get(url)
 
@@ -70,28 +95,24 @@ def process_statistics():
         response2 = requests.get(data_link)
 
         if response2.status_code != 200:
-            print(f"Error {response.status_code}: {response.reason}")
-            sys.exit(response.status_code)
+            raise PipelineError(f"Error {response2.status_code}: {response2.reason}")
 
         data = response2.json()
-
     else:
-        print(f"Error {response.status_code}: {response.reason}")
-        sys.exit(response.status_code)
+        raise PipelineError(f"Error {response.status_code}: {response.reason}")
 
     if data.get('data_source') != "BOSCAR Data" or data.get('data_type') != "Dataset":
-        return
+        return all_lga_stats, lga_stats_by_year
 
     for stat in data.get('events'):
         all_lga_stats.append(stat)
-
         year = stat.get('time_object').get('date_end').split('-')[0]
         lga_stats_by_year[year].append(stat)
 
-    return
+    return all_lga_stats, lga_stats_by_year
 
 
-def upload_lga_overall_data(lga_sentiment_scores_all, lga_statistical_scores_all, lga_total_crimes, lga_total_articles):
+def upload_lga_overall_data(lga_sentiment_scores_all, lga_statistical_scores_all, lga_total_crimes, lga_total_articles, lga_overall_table):
     table_entries = defaultdict(lambda: {
         "sentiment_score": 0,
         "statistical_score": 0,
@@ -127,7 +148,7 @@ def upload_lga_overall_data(lga_sentiment_scores_all, lga_statistical_scores_all
             writer.put_item(Item=item)
 
 
-def upload_lga_by_year_data():
+def upload_lga_by_year_data(lga_stats_by_year, article_events_by_year, lga_by_year_table):
     table_entries = defaultdict(lambda: {
         "sentiment": 0,
         "stats": 0,
@@ -181,8 +202,6 @@ def upload_lga_by_year_data():
         for item in data:
             writer.put_item(Item=item)
 
-    return
-
 def count_total_articles(events):
     total_articles = defaultdict(int)
 
@@ -195,18 +214,18 @@ def count_total_articles(events):
     return total_articles
 
 
-def count_total_crimes(events):
-    total_crimes = defaultdict(int)
+# def count_total_crimes(events):
+#     total_crimes = defaultdict(int)
 
-    for event in events:
-        lga_suburb = event.get("lga")
-        lga = LGA_FORMAT_MAP.get(lga_suburb.upper(), "LGA mapping not found").title()
+#     for event in events:
+#         lga_suburb = event.get("lga")
+#         lga = LGA_FORMAT_MAP.get(lga_suburb.upper(), "LGA mapping not found").title()
 
-        if lga != "LGA mapping not found":
-            total_crimes[lga] += event.get("offence_count")
+#     if lga != "LGA mapping not found":
+#         lga = lga.title()
+#         total_crimes[lga] += event.get("offence_count")
 
-    return total_crimes
-
+#     return total_crimes
 
 
 def sentiment_scores(events):

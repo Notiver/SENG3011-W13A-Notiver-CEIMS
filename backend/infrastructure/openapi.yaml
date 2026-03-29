@@ -4,46 +4,28 @@ info:
   version: 1.0.0
 paths:
   # --- DATA COLLECTION SERVICE ---
-  /data-collection/collect-articles:
-    get:
-      x-amazon-apigateway-integration:
-        payloadFormatVersion: "2.0"
-        type: aws_proxy
-        uri: arn:aws:apigateway:ap-southeast-2:lambda:path/2015-03-31/functions/arn:aws:lambda:ap-southeast-2:${AWS_ACCOUNT_ID}:function:data-collection-function/invocations
-  
   /data-collection/{proxy+}:
     x-amazon-apigateway-any-method:
       x-amazon-apigateway-integration:
         payloadFormatVersion: "2.0"
-        type: aws_proxy
-        uri: arn:aws:apigateway:ap-southeast-2:lambda:path/2015-03-31/functions/arn:aws:lambda:ap-southeast-2:${AWS_ACCOUNT_ID}:function:data-collection-function/invocations
+        type: "aws_proxy"
+        httpMethod: "POST"
+        uri: "arn:aws:apigateway:ap-southeast-2:lambda:path/2015-03-31/functions/arn:aws:lambda:ap-southeast-2:${AWS_ACCOUNT_ID}:function:data-collection-function/invocations"
 
   # --- DATA PROCESSING SERVICE ---
-  /data-processing/process-articles:
-    get:
-      x-amazon-apigateway-integration:
-        payloadFormatVersion: "2.0"
-        type: aws_proxy
-        uri: arn:aws:apigateway:ap-southeast-2:lambda:path/2015-03-31/functions/arn:aws:lambda:ap-southeast-2:${AWS_ACCOUNT_ID}:function:data-nlp-analytics/invocations
-
   /data-processing/{proxy+}:
     x-amazon-apigateway-any-method:
       x-amazon-apigateway-integration:
         payloadFormatVersion: "2.0"
-        type: aws_proxy
-        uri: arn:aws:apigateway:ap-southeast-2:lambda:path/2015-03-31/functions/arn:aws:lambda:ap-southeast-2:${AWS_ACCOUNT_ID}:function:data-nlp-analytics/invocations
+        type: "aws_proxy"
+        httpMethod: "POST"
+        uri: "arn:aws:apigateway:ap-southeast-2:lambda:path/2015-03-31/functions/arn:aws:lambda:ap-southeast-2:${AWS_ACCOUNT_ID}:function:data-nlp-analytics/invocations"
 
   # --- DATA RETRIEVAL SERVICE ---
-  /data-retrieval/run-retrieval:
-    get:
-      x-amazon-apigateway-integration:
-        payloadFormatVersion: "2.0"
-        type: aws_proxy
-        uri: arn:aws:apigateway:ap-southeast-2:lambda:path/2015-03-31/functions/arn:aws:lambda:ap-southeast-2:${AWS_ACCOUNT_ID}:function:data-retrieval-function/invocations
-
   /data-retrieval/{proxy+}:
     x-amazon-apigateway-any-method:
       x-amazon-apigateway-integration:
         payloadFormatVersion: "2.0"
-        type: aws_proxy
-        uri: arn:aws:apigateway:ap-southeast-2:lambda:path/2015-03-31/functions/arn:aws:lambda:ap-southeast-2:${AWS_ACCOUNT_ID}:function:data-retrieval-function/invocations
+        type: "aws_proxy"
+        httpMethod: "POST"
+        uri: "arn:aws:apigateway:ap-southeast-2:lambda:path/2015-03-31/functions/arn:aws:lambda:ap-southeast-2:${AWS_ACCOUNT_ID}:function:data-retrieval-function/invocations"
