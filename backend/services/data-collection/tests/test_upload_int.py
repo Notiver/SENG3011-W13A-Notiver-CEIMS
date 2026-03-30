@@ -78,3 +78,22 @@ def test_upload_data_invalid_file_type():
 
     # Depending on how process_data() handles bad files, you likely want it to return a 500 or 400 error
     assert response.status_code in [400, 500]
+    
+@patch('app.api.routes.process_data')
+def test_upload_data_s3_crash(mock_process):
+    """Forces an exception during upload to test the 500 error block."""
+    # We make process_data throw an error to simulate a total failure
+    mock_process.side_effect = Exception("Simulated S3 Crash")
+    
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    file_path = os.path.join(current_dir, "test_data", "LGA_trends.xlsx")
+    
+    with open(file_path, "rb") as f:
+        response = client.post(
+            "/upload-data",
+            files={"my_file": ("LGA_trends.xlsx", f, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
+        )
+
+    # Asserts that lines 66-74 successfully caught the error and returned a 500
+    assert response.status_code == 500
+    assert "Simulated S3 Crash" in response.json()["detail"]

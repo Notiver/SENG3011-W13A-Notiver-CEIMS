@@ -128,3 +128,42 @@ def test_post_collect_articles_unauthenticated(mock_scraper):
     
     assert response.status_code == 200
     assert response.json()["user_id"] == "guest_user"
+
+@patch('app.api.routes.execute_full_collection')
+def test_post_articles_success(mock_execute):
+    mock_execute.return_value = {"status": "success", "message": "Articles collected."}
+    response = client.post("/upload-articles")
+    assert response.status_code == 200
+
+@patch('app.api.routes.execute_full_collection')
+def test_post_articles_failure(mock_execute):
+    mock_execute.return_value = {"status": "error", "message": "Guardian API down."}
+    response = client.post("/upload-articles")
+    assert response.status_code == 500
+    assert response.json()["detail"] == "Guardian API down."
+
+@patch('app.api.routes.fetch_collection_status')
+def test_get_articles(mock_fetch):
+    mock_fetch.return_value = {"status": "success", "count": 5}
+    response = client.get("/collect-articles")
+    assert response.status_code == 200
+    assert response.json()["count"] == 5
+
+def test_get_user_id_decode_exception():
+    # A token that is NOT valid base64 will crash the decoder and fall back to guest_user
+    bad_headers = {"Authorization": "Bearer not.real.base64"}
+    payload = {"location": "Sydney", "timeFrame": "1_year", "category": "crime"}
+    
+    response = client.post("/collect-articles", json=payload, headers=bad_headers)
+    assert response.status_code == 200
+    # It gracefully caught the error and assigned guest_user
+    assert response.json()["user_id"] == "guest_user" 
+
+@patch('app.api.routes.run_dynamic_scraper')
+def test_post_collect_articles_exception(mock_scraper):
+    mock_scraper.side_effect = Exception("Simulated Scraper Crash")
+    payload = {"location": "Sydney", "timeFrame": "1_year", "category": "crime"}
+    
+    response = client.post("/collect-articles", json=payload)
+    assert response.status_code == 500
+    assert "Simulated Scraper Crash" in response.json()["detail"]
