@@ -52,24 +52,16 @@ def test_root_endpoint():
     assert response.status_code == 200
     assert response.json() == {"message": "Welcome to Notiver's homepage!"}
 
+@patch('boto3.client')
 @patch('app.api.routes.collect_data_url')
-def test_get_collect_data_success(mock_s3_env):
+def test_get_collect_data_success(mock_url_generator, mock_boto_client, mock_s3_env):
     """Integration Test: Validates that the API successfully requests a pre-signed S3 URL."""
     
     mock_url_generator.return_value = "https://fake-aws-url.com/excel.xlsx"
-    # 1. Seed the mocked S3 bucket with a fake Excel file so it exists when the API looks for it
-    expected_file_key = f"{config.EXCEL_BUCKET_NAME}/{config.EXCEL_FILE_NAME}"
-    mock_s3_env.put_object(
-        Bucket=config.S3_BUCKET_NAME, 
-        Key=expected_file_key, 
-        Body=b"fake excel bytes"
-    )
-
-    # 2. Hit the endpoint
     response = client.get("/collect-data")
 
-    # 3. Assertions
-    assert response.status_code == 200
+    assert response.status_code == 200, response.json() 
+    
     data = response.json()
     assert "url" in data
     assert data["url"] == "https://fake-aws-url.com/excel.xlsx"

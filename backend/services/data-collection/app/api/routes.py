@@ -9,6 +9,7 @@ from app.services.article_manager import execute_full_collection, fetch_collecti
 from app.services.scraper_v2 import run_dynamic_scraper
 import json
 import base64
+import boto3
 
 router = APIRouter()
 
