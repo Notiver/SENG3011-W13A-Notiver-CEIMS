@@ -68,7 +68,7 @@ def log_storage_event(caller_ip: str, filename: str, size_bytes: int, bucket: st
         "event_type": "storage",
         "action": action,
         "caller_ip": caller_ip,
-        "filename": filename,
+        "file_name": filename,
         "size_mb": size_mb,
         "bucket": bucket
     })

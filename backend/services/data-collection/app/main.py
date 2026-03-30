@@ -13,7 +13,7 @@ app = FastAPI(root_path="/data-collection")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.middleware("http")(observability_middleware)
-metrics.set_default_dimensions(service="data-collection")
+# metrics.set_default_dimensions(service="data-collection")
 
 app.add_middleware(
     CORSMiddleware,

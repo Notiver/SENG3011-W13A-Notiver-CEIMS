@@ -9,6 +9,7 @@ from app.services.article_manager import execute_full_collection, fetch_collecti
 from app.services.scraper_v2 import run_dynamic_scraper
 import json
 import base64
+import boto3
 
 router = APIRouter()
 
@@ -48,10 +49,10 @@ def upload_data(request: Request, my_file: UploadFile = File(...)):
         "data upload attempt"
     )
 
-    json_data = process_data(my_file)
-    buffer = io.BytesIO(json_data.encode('utf-8'))
-    file_name = config.EXCEL_BUCKET_NAME + "/" + config.EXCEL_FILE_NAME
     try:
+        json_data = process_data(my_file)
+        buffer = io.BytesIO(json_data.encode('utf-8'))
+        file_name = config.EXCEL_BUCKET_NAME + "/" + config.EXCEL_FILE_NAME
         upload_fileobj_to_s3(buffer, config.S3_BUCKET_NAME, file_name)
 
         log_storage_event(
@@ -76,6 +77,10 @@ def upload_data(request: Request, my_file: UploadFile = File(...)):
 def get_data():
     try:
         file_name = config.EXCEL_BUCKET_NAME + "/" + config.EXCEL_FILE_NAME
+        
+        s3 = boto3.client('s3', region_name=config.REGION if hasattr(config, 'REGION') else "ap-southeast-2")
+        s3.head_object(Bucket=config.S3_BUCKET_NAME, Key=file_name)
+        
         url = collect_data_url(config.S3_BUCKET_NAME, file_name)
         return {"url": url}
     except Exception as e:
