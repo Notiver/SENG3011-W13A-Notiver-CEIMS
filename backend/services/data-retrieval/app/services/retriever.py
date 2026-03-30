@@ -213,21 +213,6 @@ def count_total_articles(events):
     
     return total_articles
 
-
-# def count_total_crimes(events):
-#     total_crimes = defaultdict(int)
-
-#     for event in events:
-#         lga_suburb = event.get("lga")
-#         lga = LGA_FORMAT_MAP.get(lga_suburb.upper(), "LGA mapping not found").title()
-
-#     if lga != "LGA mapping not found":
-#         lga = lga.title()
-#         total_crimes[lga] += event.get("offence_count")
-
-#     return total_crimes
-
-
 def sentiment_scores(events):
     sent_sum = {}
     sent_count = {}

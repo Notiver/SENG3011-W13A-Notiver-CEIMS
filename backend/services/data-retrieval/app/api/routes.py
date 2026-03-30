@@ -20,13 +20,13 @@ def get_lga_stats(lga: str, db=Depends(get_dynamodb_resource)):
     try:
         table = db.Table('lga-overall')
         response = table.get_item(Key={"lga": lga})
-
-        if "Item" not in response:
-            raise HTTPException(status_code=404, detail="LGA not found")
-
-        return response["Item"]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+    if "Item" not in response:
+        raise HTTPException(status_code=404, detail="LGA not found")
+
+    return response["Item"]
     
 @router.get("/lga/{lga}/yearly")
 def get_lga_yearly(lga: str, db=Depends(get_dynamodb_resource)):
