@@ -76,6 +76,10 @@ def upload_data(request: Request, my_file: UploadFile = File(...)):
 def get_data():
     try:
         file_name = config.EXCEL_BUCKET_NAME + "/" + config.EXCEL_FILE_NAME
+        
+        s3 = boto3.client('s3', region_name=config.REGION if hasattr(config, 'REGION') else "ap-southeast-2")
+        s3.head_object(Bucket=config.S3_BUCKET_NAME, Key=file_name)
+        
         url = collect_data_url(config.S3_BUCKET_NAME, file_name)
         return {"url": url}
     except Exception as e:
