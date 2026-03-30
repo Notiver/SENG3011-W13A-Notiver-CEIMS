@@ -49,10 +49,10 @@ def upload_data(request: Request, my_file: UploadFile = File(...)):
         "data upload attempt"
     )
 
-    json_data = process_data(my_file)
-    buffer = io.BytesIO(json_data.encode('utf-8'))
-    file_name = config.EXCEL_BUCKET_NAME + "/" + config.EXCEL_FILE_NAME
     try:
+        json_data = process_data(my_file)
+        buffer = io.BytesIO(json_data.encode('utf-8'))
+        file_name = config.EXCEL_BUCKET_NAME + "/" + config.EXCEL_FILE_NAME
         upload_fileobj_to_s3(buffer, config.S3_BUCKET_NAME, file_name)
 
         log_storage_event(
