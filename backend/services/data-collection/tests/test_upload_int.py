@@ -1,7 +1,6 @@
 import os
 import pytest
 import boto3
-import json
 from fastapi.testclient import TestClient
 from moto import mock_aws
 from unittest.mock import patch
