@@ -1,15 +1,12 @@
 import pytest
 from unittest.mock import patch
-from decimal import Decimal
 
 # Adjust this import to match your actual file structure
 from app.services.retriever import (
     count_total_articles,
     sentiment_scores,
     lga_aggregate,
-    stat_score,
-    PipelineError,
-    process_articles
+    stat_score
 )
 
 class TestRetrieverMathLogic:
