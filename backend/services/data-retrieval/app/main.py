@@ -13,7 +13,7 @@ app = FastAPI(title="Notiver Retrieval API", root_path="/data-retrieval")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.middleware("http")(observability_middleware)
-metrics.set_default_dimensions(service="data-retrieval")
+# metrics.set_default_dimensions(service="data-retrieval")
 
 app.add_middleware(
     CORSMiddleware,
