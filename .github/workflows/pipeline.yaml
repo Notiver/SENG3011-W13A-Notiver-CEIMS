@@ -81,12 +81,13 @@ jobs:
           ECR_REPOSITORY: notiver-data-collection
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          cd backend/services/data-collection
           docker build \
             --provenance=false \
             --platform linux/amd64 \
+            -f backend/services/data-collection/Dockerfile \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+            backend/
             .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
@@ -107,13 +108,13 @@ jobs:
           ECR_REPOSITORY: notiver-nlp-processor
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          cd backend/services/data-processing
-          cp ../data-retrieval/utils/SUBURB_TO_LGA_DATA.json ./SUBURB_TO_LGA_DATA.json
           docker build \
             --provenance=false \
             --platform linux/amd64 \
+            -f backend/services/data-processing/Dockerfile \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+            backend/
             .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
@@ -134,12 +135,13 @@ jobs:
           ECR_REPOSITORY: notiver-data-retrieval
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          cd backend/services/data-retrieval
           docker build \
             --provenance=false \
             --platform linux/amd64 \
+            -f backend/services/data-retrieval/Dockerfile \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+            backend/
             .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
