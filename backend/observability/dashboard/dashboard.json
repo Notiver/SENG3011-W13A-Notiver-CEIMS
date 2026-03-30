@@ -105,64 +105,45 @@
         {
             "type": "log",
             "properties": {
+                "region": "ap-southeast-2",
                 "title": "Recent Errors",
-                "queryString": "fields @timestamp, @message | filter @message like /ERROR/ or level = \"ERROR\" | sort @timestamp desc | limit 20",
-                "logGroupNames": [
-                    "/aws/lambda/data-collection-function",
-                    "/aws/lambda/data-retrieval-function",
-                    "/aws/lambda/data-nlp-analytics"
-                ],
+                "query": "SOURCE '/aws/lambda/data-collection-function' | SOURCE '/aws/lambda/data-retrieval-function' | SOURCE '/aws/lambda/data-nlp-analytics' | fields @timestamp, @message | filter @message like /ERROR/ or level = \"ERROR\" | sort @timestamp desc | limit 20",
                 "view": "table"
             }
         },
         {
             "type": "log",
             "properties": {
+                "region": "ap-southeast-2",
                 "title": "Request Count by Endpoint",
-                "queryString": "fields endpoint | stats count(*) as requests by endpoint | sort requests desc",
-                "logGroupNames": [
-                    "/aws/lambda/data-collection-function",
-                    "/aws/lambda/data-retrieval-function",
-                    "/aws/lambda/data-nlp-analytics"
-                ],
+                "query": "SOURCE '/aws/lambda/data-collection-function' | SOURCE '/aws/lambda/data-retrieval-function' | SOURCE '/aws/lambda/data-nlp-analytics' | stats count(*) as requests by endpoint\n| filter ispresent(endpoint)\n| sort requests desc",
                 "view": "table"
             }
         },
         {
             "type": "log",
             "properties": {
-                "title": "Average Response Time by Endpoint",
-                "queryString": "fields endpoint, duration_ms | stats avg(duration_ms) as avg_ms by endpoint | sort avg_ms desc",
-                "logGroupNames": [
-                    "/aws/lambda/data-collection-function",
-                    "/aws/lambda/data-retrieval-function",
-                    "/aws/lambda/data-nlp-analytics"
-                ],
+                "region": "ap-southeast-2",
+                "title": "Average Response Time by Endpoint (ms)",
+                "query": "SOURCE '/aws/lambda/data-collection-function' | SOURCE '/aws/lambda/data-retrieval-function' | SOURCE '/aws/lambda/data-nlp-analytics' | stats avg(duration_ms) as avg_ms by endpoint\n| filter ispresent(endpoint)\n| sort avg_ms desc",
                 "view": "table"
             }
         },
         {
             "type": "log",
             "properties": {
+                "region": "ap-southeast-2",
                 "title": "Top Callers by IP",
-                "queryString": "fields caller_ip | stats count(*) as requests by caller_ip | sort requests desc | limit 10",
-                "logGroupNames": [
-                    "/aws/lambda/data-collection-function",
-                    "/aws/lambda/data-retrieval-function",
-                    "/aws/lambda/data-nlp-analytics"
-                ],
+                "query": "SOURCE '/aws/lambda/data-collection-function' | SOURCE '/aws/lambda/data-retrieval-function' | SOURCE '/aws/lambda/data-nlp-analytics' | stats count(*) as requests by caller_ip\n| filter ispresent(caller_ip)\n| sort requests desc\n| limit 10",
                 "view": "table"
             }
         },
         {
             "type": "log",
             "properties": {
+                "region": "ap-southeast-2",
                 "title": "Spam Events",
-                "queryString": "fields @timestamp, caller_ip, endpoint, reason | filter event_type = \"spam\" | sort @timestamp desc | limit 20",
-                "logGroupNames": [
-                    "/aws/lambda/data-collection-function",
-                    "/aws/lambda/data-nlp-analytics"
-                ],
+                "query": "SOURCE '/aws/lambda/data-collection-function' | SOURCE '/aws/lambda/data-nlp-analytics' | fields @timestamp, caller_ip, endpoint, reason\n| filter event_type = \"spam\"\n| sort @timestamp desc\n| limit 20",
                 "view": "table"
             }
         }
