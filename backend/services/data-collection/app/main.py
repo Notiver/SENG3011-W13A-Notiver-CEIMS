@@ -28,5 +28,8 @@ app.add_middleware(
 )
 
 app.include_router(router)
-handler = Mangum(app)
-handler = tracer.capture_lambda_handler(handler)
+_mangum_handler = Mangum(app)
+
+@tracer.capture_lambda_handler
+def handler(event, context):
+    return _mangum_handler(event, context)
