@@ -7,6 +7,9 @@ from transformers import pipeline
 from app import config
 from utils.crime_classifier import classify_crime
 from utils.location_classifier import get_location_metadata
+from aws_lambda_powertools import Tracer
+
+tracer = Tracer(service="data-processing")
 
 try:
     session = boto3.Session(profile_name=config.PROFILE_NAME)
@@ -14,15 +17,17 @@ try:
 except Exception:
     s3 = boto3.client('s3', region_name=config.REGION)
 
+@tracer.capture_method
 def run_nlp_pipeline():
     """Fetches articles via HTTP, processes them, and uploads the JSON results."""
 
     print("Loading RoBERTa model...")
-    sentiment_task = pipeline(
-      "sentiment-analysis", 
-      model="cardiffnlp/twitter-roberta-base-sentiment-latest", 
-      top_k=None
-    )
+    with tracer.create_subsegment("Load_RoBERTa_Model") as subsegment:
+        sentiment_task = pipeline(
+        "sentiment-analysis", 
+        model="cardiffnlp/twitter-roberta-base-sentiment-latest", 
+        top_k=None
+        )
 
     
     print("Loading RoBERTa model...")
@@ -110,6 +115,7 @@ def run_nlp_pipeline():
         "skipped": skipped_count
     }
 
+@tracer.capture_method
 def fetch_processed_data():
     """Fetches the aggregated JSON file from S3."""
     bulk_s3_key = f"{config.NLP_BUCKET_NAME}/all_processed_articles.json"

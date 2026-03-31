@@ -5,9 +5,10 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from observability.middleware.rate_limiter import limiter
 from observability.middleware.logging_middleware import observability_middleware
-from aws_lambda_powertools import Metrics
+from aws_lambda_powertools import Metrics, Tracer
 from fastapi.middleware.cors import CORSMiddleware
 
+tracer = Tracer(service="data-retrieval")
 metrics = Metrics(namespace="Notiver", service="data-retrieval")
 app = FastAPI(title="Notiver Retrieval API", root_path="/data-retrieval")
 app.state.limiter = limiter
@@ -28,3 +29,4 @@ app.add_middleware(
 
 app.include_router(router)
 handler = Mangum(app)
+handler = tracer.capture_lambda_handler(handler)
