@@ -22,7 +22,7 @@ def run_nlp_pipeline():
     """Fetches articles via HTTP, processes them, and uploads the JSON results."""
 
     print("Loading RoBERTa model...")
-    with tracer.create_subsegment("Load_RoBERTa_Model") as subsegment:
+    with tracer.create_subsegment("Load_RoBERTa_Model"):
         sentiment_task = pipeline(
         "sentiment-analysis", 
         model="cardiffnlp/twitter-roberta-base-sentiment-latest", 
