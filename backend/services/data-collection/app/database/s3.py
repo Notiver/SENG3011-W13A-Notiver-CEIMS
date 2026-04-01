@@ -1,6 +1,10 @@
 import boto3
 from app import config
+from aws_lambda_powertools import Tracer
 
+tracer = Tracer(service="data-collection")
+
+@tracer.capture_method
 def upload_fileobj_to_s3(file_obj, bucket_name, s3_key):
     """Uploads a file-like object directly to an S3 object."""
     s3 = boto3.client('s3')
@@ -30,6 +34,7 @@ def collect_data_url(bucket_name, s3_key):
     )
     return url
 
+@tracer.capture_method
 def fetch_all_articles(bucket_name, prefix):
     """Fetches all article text files from S3 and returns them as a list of dicts."""
     s3 = boto3.client('s3')
