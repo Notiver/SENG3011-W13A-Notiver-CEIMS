@@ -154,35 +154,6 @@
                 "title": "Recent Execution Traces",
                 "query": "SOURCE '/aws/lambda/data-collection-function' | SOURCE '/aws/lambda/data-retrieval-function' | SOURCE '/aws/lambda/data-nlp-analytics' | fields @timestamp, service, xray_trace_id, @message\n| filter ispresent(xray_trace_id)\n| sort @timestamp desc\n| limit 15"
             }
-        },
-        {
-            "type": "explorer",
-            "properties": {
-                "period": 300,
-                "region": "ap-southeast-2",
-                "title": "System Execution Flow Map",
-                "metrics": [
-                {
-                    "resourceType": "AWS::XRay::Service",
-                    "metricName": "ServiceMap"
-                }
-                ],
-                "aggregateBy": {
-                    "key": "Service",
-                    "func": "avg"
-                },
-                "labels": [
-                    { "key": "Service", "value": "data-collection" },
-                    { "key": "Service", "value": "data-processing" },
-                    { "key": "Service", "value": "data-retrieval" }
-                ],
-                "widgetOptions": {
-                    "view": "serviceMap",
-                    "rowsPerPage": 1,
-                    "widgetsPerRow": 1,
-                    "legend": { "position": "bottom" }
-                }
-            }
         }
     ]
 }
