@@ -122,6 +122,10 @@ def post_dynamic_articles(request: ScrapeRequest, fast_request: Request):
     user_id = get_user_id(fast_request) 
     job_id = str(uuid.uuid4())
 
+    if not SQS_QUEUE_URL:
+        print("ERROR: SQS_QUEUE_URL environment variable is missing!")
+        raise HTTPException(status_code=500, detail="Server configuration error: SQS Queue not linked.")
+
     job_ticket = {
         "job_id": job_id,
         "user_id": user_id,
