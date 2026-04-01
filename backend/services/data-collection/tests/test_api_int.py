@@ -9,7 +9,7 @@ from unittest.mock import patch, MagicMock
 
 from app.main import app 
 from app import config
-import app.api.routes
+from app.api import routes
 
 client = TestClient(app)
 
@@ -34,9 +34,9 @@ def mock_aws_env():
         sqs = boto3.client("sqs", region_name=os.environ["AWS_DEFAULT_REGION"])
         queue = sqs.create_queue(QueueName="test-scraper-queue")
         
-        # Inject the fake URL into the app.api.routes module (since it loads at import time)
+        # Inject the fake URL into the routes module
         fake_queue_url = queue["QueueUrl"]
-        app.api.routes.SQS_QUEUE_URL = fake_queue_url
+        routes.SQS_QUEUE_URL = fake_queue_url
         os.environ["SQS_QUEUE_URL"] = fake_queue_url
         
         yield s3, sqs
@@ -145,7 +145,7 @@ def test_get_user_id_decode_exception(mock_aws_env):
 
 def test_post_collect_articles_missing_sqs_url(mock_aws_env):
     """Tests the 500 configuration error block if SQS_QUEUE_URL is not set."""
-    app.api.routes.SQS_QUEUE_URL = None
+    routes.SQS_QUEUE_URL = None
     payload = {"location": "Sydney", "timeFrame": "1_year", "category": "crime"}
     
     response = client.post("/collect-articles", json=payload)
