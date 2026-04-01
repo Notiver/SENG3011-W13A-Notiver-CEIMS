@@ -1,4 +1,10 @@
 import io
+import os
+import json
+import base64
+import boto3
+import uuid
+
 from fastapi import APIRouter, HTTPException, UploadFile, File, Request
 from pydantic import BaseModel
 from app.services.process_excel import process_data
@@ -6,12 +12,9 @@ from app.database.s3 import upload_fileobj_to_s3, collect_data_url
 from app import config
 from observability.middleware.logging_middleware import log_storage_event, log_spam_event
 from app.services.article_manager import execute_full_collection, fetch_collection_status
-from app.services.scraper_v2 import run_dynamic_scraper
-import json
-import base64
-import boto3
 
 router = APIRouter()
+SQS_QUEUE_URL = os.getenv("SQS_QUEUE_URL")
 
 def get_user_id(request: Request) -> str:
     auth_header = request.headers.get("Authorization")
@@ -31,7 +34,6 @@ class ScrapeRequest(BaseModel):
     location: str
     timeFrame: str
     category: str
-
 
 @router.get("/")
 def root():
@@ -118,21 +120,34 @@ def get_articles():
 @router.post("/collect-articles")
 def post_dynamic_articles(request: ScrapeRequest, fast_request: Request):
     user_id = get_user_id(fast_request) 
+    job_id = str(uuid.uuid4())
+
+    if not SQS_QUEUE_URL:
+        print("ERROR: SQS_QUEUE_URL environment variable is missing!")
+        raise HTTPException(status_code=500, detail="Server configuration error: SQS Queue not linked.")
+
+    job_ticket = {
+        "job_id": job_id,
+        "user_id": user_id,
+        "category": request.category,
+        "location": request.location,
+        "time_frame": request.timeFrame
+    }
     
     try:
-        results = run_dynamic_scraper(
-            location=request.location,
-            time_frame=request.timeFrame,
-            category=request.category,
-            user_id=user_id
+        sqs_client = boto3.client('sqs', region_name=config.REGION if hasattr(config, 'REGION') else "ap-southeast-2")
+        
+        sqs_client.send_message(
+            QueueUrl=SQS_QUEUE_URL,
+            MessageBody=json.dumps(job_ticket)
         )
         
         return {
-            "status": "success", 
-            "user_id": user_id, 
-            "count": len(results), 
-            "articles": results
+            "status": "processing", 
+            "job_id": job_id, 
+            "message": "Scrape job successfully queued in background."
         }
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Failed to send to SQS: {e}")
+        raise HTTPException(status_code=500, detail="Failed to queue scraping job.")
