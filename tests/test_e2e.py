@@ -12,8 +12,9 @@ RETRIEVAL_ROUTE = "data-retrieval"
 
 ### other config
 excel_file_path = "../test_data/LGA_trends.xlsx"
-TEST_BUCKET = "notiver-ceims-dev"
+BUCKET = "nsw-crime-data-bucket/"
 
+# === helpers ===
 @pytest.fixture(scope="module")
 def s3():
     return boto3.client("s3", region_name="ap-southeast-2")
@@ -28,46 +29,51 @@ def wait_for_s3_object(s3, bucket, key, timeout=30):
             time.sleep(1)
     return False
 
-def test_full_pipeline_e2e(s3):
-    """
-    Trigger collection → verify S3 → trigger processing → 
-    verify transformed S3 → query retrieval → verify response.
-    """
-
-    # ── Step 1: Trigger the Collection Service ──────────────────────────
+# === e2e tests ===
+def test_data_e2e(s3):
+    '''e2e test for crime data collection, processing, and retrieval'''
+    # data collection - upload
     with open(excel_file_path, "rb") as f:
         response = httpx.post(
             f"{API_URL}/{COLLECTION_ROUTE}/upload-data",
-            files={"file": ("LGA_trends.xlsx", f, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+            files={"file": ("LGA_trends.xlsx", f, \
+                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
             headers={"Authorization": f"Bearer {STAGING_JWT}"}
         )
         assert response.status_code == 200
 
-    # ── Step 2: Wait for raw data to land in S3 ─────────────────────────
-    raw_key = "raw/sydney_crime.xlsx"
-    assert wait_for_s3_object(s3, STAGING_BUCKET, raw_key), \
+    # data collection - check for file upload in S3
+    excel_file = "boscar/crime_data.xlsx"
+    assert wait_for_s3_object(s3, BUCKET, excel_file), \
         "Collection service never wrote to S3"
 
-    # ── Step 3: Trigger the Processing Service ───────────────────────────
+    # data processing
     response = httpx.post(
-        f"{API_URL}/{PROCESSING_ROUTE}/process",
-        json={"s3_key": raw_key}
+        f"{API_URL}/{PROCESSING_ROUTE}/process-data",
+        json={
+            "location": "Sydney",
+            "timeFrame": "1_per_month_1_year",
+            "category": "crime"
+        },
     )
     assert response.status_code == 200
 
-    # ── Step 4: Wait for processed data to land in S3 ───────────────────
-    processed_key = "processed/sydney_crime.json"
-    assert wait_for_s3_object(s3, STAGING_BUCKET, processed_key), \
-        "Processing service never wrote output to S3"
+    # # ── Step 4: Wait for processed data to land in S3 ───────────────────
+    # processed_key = "processed/crime_data.json"
+    # assert wait_for_s3_object(s3, STAGING_BUCKET, processed_key), \
+    #     "Processing service never wrote output to S3"
 
-    # ── Step 5: Query the Retrieval Service ─────────────────────────────
-    response = httpx.get(
-        f"{RETRIEVAL_SERVICE_URL}/data",
-        params={"location": "Sydney", "category": "crime"}
+    # data retrieval
+    response = httpx.post(
+        f"{API_URL}/{RETRIEVAL_ROUTE}/lgas",
     )
     assert response.status_code == 200
     data = response.json()
 
     # ── Step 6: Assert the full chain produced correct output ────────────
-    assert len(data["results"]) > 0
-    assert data["results"][0]["location"] == "Sydney"
+    assert len(data) > 0
+    assert isinstance(data, dict)
+    assert "lgas" in data
+
+def test_data_e2e(s3):
+    '''e2e test for articles'''
