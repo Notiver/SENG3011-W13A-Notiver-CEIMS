@@ -6,6 +6,9 @@ import traceback
 import calendar
 from datetime import datetime, timedelta
 from app import config
+from aws_lambda_powertools import Tracer
+
+tracer = Tracer(service="data-collection")
 
 CATEGORY_CONFIG = {
     "crime": {"query": "(police OR crime OR murder OR theft)", "section": "news|world|australia-news|uk-news"},
@@ -18,6 +21,7 @@ CATEGORY_CONFIG = {
     "climate": {"query": "(climate change OR environment OR emissions)", "section": "environment|science"}
 }
 
+@tracer.capture_method
 def run_dynamic_scraper(location: str, time_frame: str, category: str, user_id: str = "guest_user"):
     print(f"Starting dynamic scrape for User: {user_id} | Loc: {location} | Cat: {category} | Time: {time_frame}")
     

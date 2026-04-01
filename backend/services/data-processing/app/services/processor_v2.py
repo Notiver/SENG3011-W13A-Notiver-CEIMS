@@ -7,6 +7,9 @@ from transformers import pipeline
 from app import config
 from utils.crime_classifier import classify_crime
 from utils.location_classifier import get_location_metadata
+from aws_lambda_powertools import Tracer
+
+tracer = Tracer(service="data-processing")
 
 try:
     session = boto3.Session(profile_name=config.PROFILE_NAME)
@@ -14,13 +17,15 @@ try:
 except Exception:
     s3 = boto3.client('s3', region_name=config.REGION)
 
+@tracer.capture_method
 def run_nlp_pipeline(params: dict = None, user_id: str = "guest"):    
     print("Loading RoBERTa sentiment model...")
-    sentiment_task = pipeline(
-        "sentiment-analysis", 
-        model="cardiffnlp/twitter-roberta-base-sentiment-latest", 
-        top_k=None
-    )
+    with tracer.create_subsegment("Load_RoBERTa_Model"):
+        sentiment_task = pipeline(
+            "sentiment-analysis", 
+            model="cardiffnlp/twitter-roberta-base-sentiment-latest", 
+            top_k=None
+        )
 
     collection_url = config.DATA_COLLECTION_URL
     print(f"Triggering collection at {collection_url} with params: {params}")
@@ -107,6 +112,7 @@ def run_nlp_pipeline(params: dict = None, user_id: str = "guest"):
         "skipped": skipped_count
     }
 
+@tracer.capture_method
 def fetch_processed_data():
     bulk_s3_key = f"{config.NLP_BUCKET_NAME}/all_processed_articles.json"
     
