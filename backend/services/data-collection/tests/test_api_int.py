@@ -143,7 +143,6 @@ def test_get_user_id_decode_exception(mock_aws_env):
     ticket = json.loads(messages[0]["Body"])
     assert ticket["user_id"] == "guest_user" 
 
-@patch('app.api.routes.SQS_QUEUE_URL', None)
 def test_post_collect_articles_missing_sqs_url(monkeypatch):
     """Tests the 500 configuration error block if SQS_QUEUE_URL is not set."""
     
@@ -151,7 +150,6 @@ def test_post_collect_articles_missing_sqs_url(monkeypatch):
     
     payload = {"location": "Sydney", "timeFrame": "1_year", "category": "crime"}
     response = client.post("/collect-articles", json=payload)
-    print("MONMEKYYYYYYYY")
     assert response.status_code == 500
     assert "Server configuration error" in response.json()["detail"]
 
