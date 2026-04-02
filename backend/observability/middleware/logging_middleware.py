@@ -4,7 +4,7 @@ from aws_lambda_powertools import Logger, Metrics
 from aws_lambda_powertools.metrics import MetricUnit
 
 logger = Logger(service="notiver")
-metrics = Metrics(namespace="Notiver", service="notiver")
+metrics = Metrics(namespace="Notiver")
 
 start_time = time.time()
 
@@ -77,13 +77,14 @@ def log_storage_event(caller_ip: str, filename: str, size_bytes: int, bucket: st
 
     if size_bytes and size_bytes > 50 * 1024 * 1024:
         logger.warning("Large file upload detected", extra={
-            "event_type": "spam_warming",
+            "event_type": "spam_warning",
             "caller_ip": caller_ip,
             "filename": filename,
             "size_mb": size_mb
         })
-
         metrics.add_metric("LargeFileWarnings", MetricUnit.Count, 1)
+
+    metrics.flush_metrics()
 
 def log_spam_event(caller_ip: str, reason: str, endpoint: str):
     logger.warning("Spam detected", extra={
@@ -94,3 +95,4 @@ def log_spam_event(caller_ip: str, reason: str, endpoint: str):
     })
 
     metrics.add_metric("SpamEvents", MetricUnit.Count, 1)
+    metrics.flush_metrics()
