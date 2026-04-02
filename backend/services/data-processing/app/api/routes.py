@@ -1,6 +1,5 @@
 from fastapi import APIRouter, HTTPException, Request
 from observability.middleware.logging_middleware import log_spam_event
-import boto3
 import json
 import base64
 from pydantic import BaseModel
