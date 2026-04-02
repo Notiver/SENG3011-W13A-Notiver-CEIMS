@@ -45,5 +45,4 @@ export const MAJOR_CITIES = [
   "Cairo, Egypt",
   "Johannesburg, South Africa",
   "Nairobi, Kenya"
-
 ];
