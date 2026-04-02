@@ -22,13 +22,13 @@ def get_lga_stats(lga: str, env=Depends(get_db_environment)):
         table_name = f"lga-overall-{env['stage']}"
         table = env['db'].Table(table_name)
         response = table.get_item(Key={"lga": lga})
-
-        if "Item" not in response:
-            raise HTTPException(status_code=404, detail="LGA not found")
-
-        return response["Item"]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+    if "Item" not in response:
+        raise HTTPException(status_code=404, detail="LGA not found")
+
+    return response["Item"]
     
 @router.get("/lga/{lga}/yearly")
 def get_lga_yearly(lga: str, env=Depends(get_db_environment)):

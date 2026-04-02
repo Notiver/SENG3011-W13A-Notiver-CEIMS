@@ -7,11 +7,14 @@ from utils.crime_dict import CRIME_CATEGORY_MAP, CRIME_WEIGHTS
 from utils.LGAData import get_lga_population
 from utils.db_manager import get_dynamodb_resource
 from decimal import Decimal
+from aws_lambda_powertools import Tracer
+
+tracer = Tracer(service="data-retrieval")
 
 class PipelineError(Exception):
     pass
 
-
+@tracer.capture_method
 def process_retrieval(dynamodb_resource=None, stage="staging"):
     if not dynamodb_resource:
         dynamodb_resource = get_dynamodb_resource()
@@ -53,7 +56,7 @@ def process_retrieval(dynamodb_resource=None, stage="staging"):
         lga_by_year_table
     )
 
-
+@tracer.capture_method
 def process_articles():
     all_article_events = []
     article_events_by_year = defaultdict(list)
@@ -74,7 +77,7 @@ def process_articles():
 
     return all_article_events, article_events_by_year
 
-
+@tracer.capture_method
 def process_statistics():
     all_lga_stats = []
     lga_stats_by_year = defaultdict(list)
@@ -103,7 +106,7 @@ def process_statistics():
 
     return all_lga_stats, lga_stats_by_year
 
-
+@tracer.capture_method
 def upload_lga_overall_data(lga_sentiment_scores_all, lga_statistical_scores_all, lga_total_crimes, lga_total_articles, lga_overall_table):
     table_entries = defaultdict(lambda: {
         "sentiment_score": 0,
@@ -139,7 +142,7 @@ def upload_lga_overall_data(lga_sentiment_scores_all, lga_statistical_scores_all
         for item in data:
             writer.put_item(Item=item)
 
-
+@tracer.capture_method
 def upload_lga_by_year_data(lga_stats_by_year, article_events_by_year, lga_by_year_table):
     table_entries = defaultdict(lambda: {
         "sentiment": 0,
@@ -204,21 +207,6 @@ def count_total_articles(events):
             total_articles[lga] += 1
     
     return total_articles
-
-
-# def count_total_crimes(events):
-#     total_crimes = defaultdict(int)
-
-#     for event in events:
-#         lga_suburb = event.get("lga")
-#         lga = LGA_FORMAT_MAP.get(lga_suburb.upper(), "LGA mapping not found").title()
-
-#     if lga != "LGA mapping not found":
-#         lga = lga.title()
-#         total_crimes[lga] += event.get("offence_count")
-
-#     return total_crimes
-
 
 def sentiment_scores(events):
     sent_sum = {}

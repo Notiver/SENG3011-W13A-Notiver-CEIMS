@@ -1,10 +1,11 @@
 from fastapi import APIRouter, HTTPException, Request
+from observability.middleware.logging_middleware import log_spam_event
 import boto3
 import json
 import base64
 from pydantic import BaseModel
 from app import config 
-from app.services.processor import run_nlp_pipeline
+from app.services.processor_v2 import run_nlp_pipeline
 router = APIRouter()
 
 class ScrapeRequest(BaseModel):
@@ -37,6 +38,7 @@ def root():
 
 @router.post("/process-articles")
 async def process_articles(request_data: ScrapeRequest, request: Request):
+    caller_ip = request.client.host if request.client else "unknown"
     user_id = get_user_id(request)
     
     try:
@@ -49,6 +51,7 @@ async def process_articles(request_data: ScrapeRequest, request: Request):
             "details": result
         }
     except Exception as e:
+        log_spam_event(caller_ip, "processing failure", "/process-articles")
         raise HTTPException(status_code=500, detail=f"Processing failed: {str(e)}")
 
 @router.get("/processed-articles")

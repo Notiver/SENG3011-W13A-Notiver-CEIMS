@@ -31,6 +31,7 @@ jobs:
       - name: Test Data Retrieval
         working-directory: ./backend/services/data-retrieval
         run: |
+          export PYTHONPATH=$PYTHONPATH:$(pwd)/../../
           pip install -r requirements.txt
           python -m pytest --cov=app --cov-report=term-missing
 
@@ -38,12 +39,14 @@ jobs:
         working-directory: ./backend/services/data-collection
         run: |
           # Only install/test if the files exist, preventing crashes
+          export PYTHONPATH=$PYTHONPATH:$(pwd)/../../
           if [ -f "requirements.txt" ]; then pip install -r requirements.txt; fi
           if [ -d "tests" ]; then python -m pytest --cov=app --cov-report=term-missing; fi
 
       - name: Test Data Processing
         working-directory: ./backend/services/data-processing
         run: |
+          export PYTHONPATH=$PYTHONPATH:$(pwd)/../../
           if [ -f "requirements.txt" ]; then pip install -r requirements.txt; fi
           if [ -d "tests" ]; then python -m pytest --cov=app --cov-report=term-missing; fi
 
@@ -85,13 +88,13 @@ jobs:
           ECR_REPOSITORY: notiver-data-collection
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          cd backend/services/data-collection
           docker build \
             --provenance=false \
             --platform linux/amd64 \
+            -f backend/services/data-collection/Dockerfile \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
-            .
+            backend/
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
 
@@ -106,14 +109,13 @@ jobs:
           ECR_REPOSITORY: notiver-nlp-processor
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          cd backend/services/data-processing
-          cp ../data-retrieval/utils/SUBURB_TO_LGA_DATA.json ./SUBURB_TO_LGA_DATA.json
           docker build \
             --provenance=false \
             --platform linux/amd64 \
+            -f backend/services/data-processing/Dockerfile \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
-            .
+            backend/
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
 
@@ -128,13 +130,13 @@ jobs:
           ECR_REPOSITORY: notiver-data-retrieval
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          cd backend/services/data-retrieval
           docker build \
             --provenance=false \
             --platform linux/amd64 \
+            -f backend/services/data-retrieval/Dockerfile \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
-            .
+            backend/
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
 
@@ -181,7 +183,6 @@ jobs:
             --api-id hbjyijsell \
             --stage-name staging
 
-
       
   push-to-production:
     needs: push-to-staging
@@ -208,3 +209,17 @@ jobs:
           aws apigatewayv2 create-deployment \
           --api-id hbjyijsell \
           --stage-name production
+
+      - name: Install observability dependencies
+        run: |
+          pip install -r backend/observability/requirements.txt
+          
+      - name: Create/Update CloudWatch Dashboard
+        run: |
+          aws cloudwatch put-dashboard \
+            --dashboard-name Notiver-Dashboard \
+            --dashboard-body file://backend/observability/dashboard/dashboard.json
+
+      - name: Create CloudWatch Alarms
+        run: |
+          python backend/observability/alerts/alarms.py
