@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { api } from "@/lib/api";
 import { MAJOR_CITIES } from "@/lib/majorCities";
+
 import { CEIMS_CATEGORIES, INTEROP_CATEGORIES } from "@/lib/dataLabels";
 import { Maximize2, Minimize2, Download, Loader2 } from 'lucide-react';
 
@@ -11,6 +12,8 @@ export default function ScraperTab() {
   const [isPolling, setIsPolling] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("crime");
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
+  const [allLgas, setAllLgas] = useState([]);
+  const [locationMode, setLocationMode] = useState<"global" | "ceims">("global");
   
   const [showInterop, setShowInterop] = useState(false);
   
@@ -108,8 +111,32 @@ export default function ScraperTab() {
       triggerFallbackOverride(error);
     }
   };
+  
+  useEffect(() => {
+    lgaDropdown();
+  }, []);
 
+  const lgaDropdown = async () => {
+    try {
+      const data = await api.getAllLgas();
+      if (!data || !data.lgas) {
+        throw new Error("No LGAs or the LGA route is down!!!");
+      }
+      setAllLgas(data.lgas);
+    } catch (error) {
+      console.error("Failed to fetch LGAs:", error);
+    }
+  };
 
+  const handleLocationModeChange = (mode: "global" | "ceims") => {
+    setLocationMode(mode);
+    if (mode === "global") {
+      setLocation(MAJOR_CITIES[0]);
+    } else {
+      setLocation(allLgas.length > 0 ? allLgas[0] : "");
+    }
+  };
+  
 
   const handleScrape = async () => {
     setLoading(true);
@@ -202,6 +229,7 @@ export default function ScraperTab() {
         <h2 className="text-l font-extrabold mt-1 text-yellow-400">Welcome Back, Jane!</h2>
         <p className="text-zinc-400 mt-2">Target news vectors for automated intelligence gathering.</p>
       </header>
+      
 
       {/* Category Selection Container */}
       <div className="space-y-4">
@@ -265,20 +293,52 @@ export default function ScraperTab() {
       {/* Search Parameters Configuration */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-zinc-900/40 p-5 rounded-2xl border border-zinc-800/80 shadow-inner">
         <div>
-          <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-2 block ml-1">Target Location</label>
+          <div className="flex justify-between items-center mb-2">
+            <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest block ml-1">Target Location</label>
+            <div className="flex bg-zinc-950 border border-zinc-800 rounded-lg p-0.5">
+              <button
+                onClick={() => handleLocationModeChange("global")}
+                disabled={loading || isProcessing}
+                className={`text-[10px] px-3 py-1 rounded-md font-bold transition-all ${locationMode === "global" ? "bg-zinc-800 text-white shadow-sm" : "text-zinc-500 hover:text-zinc-300"}`}
+              >
+                GLOBAL
+              </button>
+              <button
+                onClick={() => handleLocationModeChange("ceims")}
+                disabled={loading || isProcessing}
+                className={`text-[10px] px-3 py-1 rounded-md font-bold transition-all ${locationMode === "ceims" ? "bg-indigo-600 text-white shadow-sm" : "text-zinc-500 hover:text-zinc-300"}`}
+              >
+                CEIMS (NSW)
+              </button>
+            </div>
+          </div>
+          
           <select 
             value={location}
             onChange={(e) => setLocation(e.target.value)}
             disabled={loading || isProcessing}
             className={`w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 transition-colors appearance-none ${(loading || isProcessing) ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
           >
-            {MAJOR_CITIES.map((city) => (
-              <option key={city} value={city}>{city}</option>
-            ))}
+            {locationMode === "global" ? (
+              // Map Global Cities
+              MAJOR_CITIES.map((city) => (
+                <option key={city} value={city}>{city}</option>
+              ))
+            ) : (
+              // Map Fetched LGAs
+              allLgas.length > 0 ? (
+                allLgas.map((lga, idx) => (
+                  <option key={idx} value={lga}>{lga}</option>
+                ))
+              ) : (
+                <option value="" disabled>Loading LGAs...</option>
+              )
+            )}
           </select>
         </div>
+        
         <div>
-          <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-2 block ml-1">Scraping Timeframe</label>
+          <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-2 block ml-1 mt-1">Scraping Timeframe</label>
           <select 
             value={timeFrame}
             onChange={(e) => setTimeFrame(e.target.value)}
