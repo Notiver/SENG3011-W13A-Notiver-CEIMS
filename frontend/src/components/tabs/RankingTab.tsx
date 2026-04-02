@@ -18,38 +18,53 @@ export default function RankingTab() {
   useEffect(() => {
     const fetchRankingData = async () => {
       try {
-        console.log("1. Requesting LGAs from API...");
-        const response = await api.getAllLgas();
-        console.log("2. LGA Response received:", response);
+        console.log("1. Fetching LGAs and Community NLP Data...");
         
-        const lgas = response.lgas || [];
-        if (lgas.length === 0) {
-           console.warn("API returned empty LGA list!");
+        // Fetch both the static LGAs and the Live AI data at the same time
+        const [lgaResponse, publicNlpData] = await Promise.all([
+          api.getAllLgas(),
+          api.getPublicCeimsMap().catch(() => ({ articles: [] }))
+        ]);
+        
+        const lgas = lgaResponse.lgas || [];
+        
+        // Group the NLP data by LGA for quick lookup
+        const nlpScoresByLga: Record<string, number> = {};
+        if (publicNlpData.articles) {
+          publicNlpData.articles.forEach((art: any) => {
+            if (art.lga) {
+              const cleanLga = art.lga.toUpperCase();
+              if (!nlpScoresByLga[cleanLga]) nlpScoresByLga[cleanLga] = 0;
+              nlpScoresByLga[cleanLga] += art.sentiment_score;
+            }
+          });
         }
 
+        console.log("2. Fetching Statistical Baselines...");
         const statsPromises = lgas.map(async (lga: string) => {
           try {
             const stats = await api.getLgaStats(lga);
             const yearly = await api.getLgaYearlyStats(lga).catch(() => null);
             
             let trend = "stable";
-            
             if (yearly && yearly.length >= 2) {
               const sortedYears = yearly.sort((a: any, b: any) => b.year - a.year);
-              const latestTotal = sortedYears[0].total;
-              const previousTotal = sortedYears[1].total;
-              
-              if (latestTotal > previousTotal) trend = "up";
-              else if (latestTotal < previousTotal) trend = "down";
+              if (sortedYears[0].total > sortedYears[1].total) trend = "up";
+              else if (sortedYears[0].total < sortedYears[1].total) trend = "down";
             }
+
+            // Base stat score + Live NLP volume modifier
+            const baseScore = stats.statistical_score || 0;
+            const liveNlpModifier = (nlpScoresByLga[lga.toUpperCase()] || 0) * 5;
+            
+            const finalSynthesizedScore = Math.min(100, Math.round(baseScore + liveNlpModifier));
 
             return {
               lga: stats.lga,
-              score: Math.round(stats.statistical_score || 0), 
+              score: finalSynthesizedScore, 
               trend: trend, 
             };
           } catch (e) {
-            console.warn(`Failed to fetch data for ${lga}:`, e);
             return null;
           }
         });
