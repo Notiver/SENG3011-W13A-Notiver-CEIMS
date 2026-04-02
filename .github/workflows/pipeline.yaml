@@ -207,6 +207,7 @@ jobs:
           --stage-name production
 
       - name: Install observability dependencies
+        working-directory: ./backend/observability
         run: |
           pip install -r backend/observability/requirements.txt
           
