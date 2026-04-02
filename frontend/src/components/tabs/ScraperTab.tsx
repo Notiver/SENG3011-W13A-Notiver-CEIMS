@@ -8,7 +8,9 @@ import { Maximize2, Minimize2, Download, Loader2 } from 'lucide-react';
 
 export default function ScraperTab() {
   const [loading, setLoading] = useState(false);
+  const [isPolling, setIsPolling] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("crime");
+  const [currentJobId, setCurrentJobId] = useState<string | null>(null);
   
   const [showInterop, setShowInterop] = useState(false);
   
@@ -68,8 +70,51 @@ export default function ScraperTab() {
     }
   }, [visibleFallbackUrls, scrapedArticles]);
 
+
+  const triggerFallbackOverride = async (errorMsg: any) => {
+    console.error("Scraper Error - Initiating Fallback Override:", errorMsg);
+    try {
+      const res = await fetch("/demo/scraped_links.txt");
+      if (res.ok) {
+        const text = await res.text();
+        const urls = text.split("\n").filter(url => url.trim() !== "");
+        setFullFallbackUrls(urls);
+        setIsFallback(true);
+      }
+    } catch (fallbackError) {
+      console.error("Fallback also failed.", fallbackError);
+    } finally {
+      setLoading(false);
+      setIsPolling(false);
+    }
+  };
+
+  const pollForJobResults = async (jobId: string) => {
+    try {
+      // NOTE: You will need to add checkScrapeStatus to your api.ts file!
+      const data = await api.checkScrapeStatus(jobId);
+      
+      if (data.status === "complete") {
+        setFullScrapedArticles(data.articles || []);
+        setIsPolling(false);
+        setLoading(false);
+      } else if (data.status === "processing") {
+        // Background worker still going. Wait 5 seconds and knock again.
+        setTimeout(() => pollForJobResults(jobId), 5000);
+      } else {
+        throw new Error("Unexpected status from polling.");
+      }
+    } catch (error) {
+      triggerFallbackOverride(error);
+    }
+  };
+
+
+
   const handleScrape = async () => {
     setLoading(true);
+    setIsPolling(false);
+    setCurrentJobId(null);
     setIsFallback(false);
     setIsProcessing(false);
     setProcessStep(0);
@@ -77,7 +122,7 @@ export default function ScraperTab() {
     setFullScrapedArticles([]);
     setScrapedArticles([]);
     setVisibleFallbackUrls([]); 
-    setFullFallbackUrls([]);    
+    setFullFallbackUrls([]);
     
     setActiveParams({ category: selectedCategory, location: location, timeFrame: timeFrame });
 
@@ -89,27 +134,23 @@ export default function ScraperTab() {
         location: location, 
         timeFrame: timeFrame
       });
-      console.log(data);
+      console.log("Initial API Response:", data);
       
-      if (data.count === 0 || !data.articles || data.articles.length === 0) {
-        throw new Error("Zero articles found by scraper. Triggering fallback.");
+      if (data.status === "processing" && data.job_id) {
+        // SQS receipted. Start polling.
+        setCurrentJobId(data.job_id);
+        setIsPolling(true);
+        pollForJobResults(data.job_id);
+      } 
+      else if (data.articles && data.articles.length > 0) {
+        setFullScrapedArticles(data.articles);
+        setLoading(false);
+      } 
+      else {
+        throw new Error("Zero articles found or invalid backend response.");
       }
-
-      setFullScrapedArticles(data.articles || data);
-
     } catch (error) {
-      console.error("Scraper Error - Initiating Fallback Override:", error);
-      try {
-        const res = await fetch("/demo/scraped_links.txt");
-        if (res.ok) {
-          const text = await res.text();
-          const urls = text.split("\n").filter(url => url.trim() !== "");
-          setFullFallbackUrls(urls);
-          setIsFallback(true);
-        }
-      } catch (fallbackError) {
-        console.error("Fallback also failed.", fallbackError);
-      }
+      triggerFallbackOverride(error);
     } finally {
       setLoading(false);
     }
@@ -292,21 +333,38 @@ export default function ScraperTab() {
       </div>
 
       {/* --- SCRAPING LOADING STATE MONITOR --- */}
-      {loading && (
+      {(loading || isPolling) && (
         <div className="space-y-4 animate-in fade-in duration-300">
           <h3 className="text-zinc-400 font-bold uppercase text-xs tracking-widest">Active Scrape Monitor</h3>
           <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-6 font-mono text-sm space-y-3 shadow-inner">
             <div className="text-zinc-500">[System] Initiating dynamic scraper module...</div>
+            
             <div className="text-indigo-400 animate-in slide-in-from-left-2 duration-300 delay-100">
-              {/* Uses activeParams so it ignores live dropdown changes! */}
               [Target] Location: {activeParams.location} | Vector: {activeParams.category.replace(/_/g, " ").toUpperCase()}
             </div>
-            <div className="text-zinc-400 animate-in slide-in-from-left-2 duration-300 delay-200">
-              [Network] Fetching ~{getExpectedCount(activeParams.timeFrame)} target articles from external API...
-            </div>
+            
+            {!isPolling ? (
+              <div className="text-zinc-400 animate-in slide-in-from-left-2 duration-300 delay-200">
+                [Network] Contacting API Gateway to reserve cloud worker...
+              </div>
+            ) : (
+              <>
+                <div className="text-emerald-400 animate-in slide-in-from-left-2 duration-300">
+                  [SQS] Job Ticket {currentJobId?.substring(0,8).toUpperCase()} Accepted!
+                </div>
+                <div className="text-zinc-400 animate-in slide-in-from-left-2 duration-300 delay-100">
+                  [Worker] Cloud lambda awakened. Fetching ~{getExpectedCount(activeParams.timeFrame)} target articles...
+                </div>
+              </>
+            )}
+
             <div className="flex items-center gap-3 text-yellow-400 animate-pulse mt-4 pt-4 border-t border-zinc-800/50">
               <Loader2 className="w-4 h-4 animate-spin" />
-              <span>Downloading and parsing content (ETA: 15-25s)...</span>
+              <span>
+                {isPolling 
+                  ? "Awaiting data package from S3 (Polling every 5s)..." 
+                  : "Connecting..."}
+              </span>
             </div>
           </div>
         </div>

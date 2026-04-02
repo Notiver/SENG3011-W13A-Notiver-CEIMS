@@ -50,10 +50,10 @@ async function fetchAPI(endpoint: string, options: RequestInit = {}) {
 export const api = {
   // --- DATA COLLECTION ---
   collectArticles: (params: { location: string; timeFrame: string; category: string }) => 
-    fetchAPI("/data-collection/collect-articles", {
-      method: "POST",
-      body: JSON.stringify(params)
-    }),
+    fetchAPI("/data-collection/collect-articles", { method: "POST", body: JSON.stringify(params) }),
+
+  checkScrapeStatus: (jobId: string) => 
+    fetchAPI(`/data-collection/collect-articles/${jobId}`, { method: "GET" }),
 
   // --- DATA PROCESSING (NLP) ---
   processArticles: () => 
