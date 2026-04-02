@@ -1,79 +1,158 @@
-import boto3
 import httpx
-import time
-import pytest
 from util_auth import STAGING_JWT
 
-### url config
-API_URL = "https://hbjyijsell.execute-api.ap-southeast-2.amazonaws.com/"
-COLLECTION_ROUTE = "data-collection"
-PROCESSING_ROUTE = "data-processing"
-RETRIEVAL_ROUTE = "data-retrieval"
+from util_config import API_URL, COLLECTION_ROUTE, PROCESSING_ROUTE, \
+    RETRIEVAL_ROUTE, BUCKET, TIMEOUT
 
-### other config
-excel_file_path = "../test_data/LGA_trends.xlsx"
-BUCKET = "nsw-crime-data-bucket/"
+from tests.conftest import wait_for_s3_object
 
-# === helpers ===
-@pytest.fixture(scope="module")
-def s3():
-    return boto3.client("s3", region_name="ap-southeast-2")
-
-def wait_for_s3_object(s3, bucket, key, timeout=30):
-    """Poll S3 until the file appears — async processing needs this."""
-    for _ in range(timeout):
-        try:
-            s3.head_object(Bucket=bucket, Key=key)
-            return True
-        except:
-            time.sleep(1)
-    return False
+EXCEL_FILE_PATH = "test_data/LGA_trends.xlsx"
 
 # === e2e tests ===
-def test_data_e2e(s3):
+def test_e2e_data(s3):
     '''e2e test for crime data collection, processing, and retrieval'''
+    print("e2e: data")
+
     # data collection - upload
-    with open(excel_file_path, "rb") as f:
+    print("Uploading Excel file to collection endpoint...", end="", flush=True)
+    with open(EXCEL_FILE_PATH, "rb") as f:
         response = httpx.post(
             f"{API_URL}/{COLLECTION_ROUTE}/upload-data",
-            files={"file": ("LGA_trends.xlsx", f, \
-                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
-            headers={"Authorization": f"Bearer {STAGING_JWT}"}
+            files={"my_file": ("LGA_trends.xlsx", f, \
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+            headers={"Authorization": f"Bearer {STAGING_JWT}"},
+            timeout=TIMEOUT
         )
-        assert response.status_code == 200
+        assert response.status_code == 200, "failed"
+        print("success")
 
     # data collection - check for file upload in S3
-    excel_file = "boscar/crime_data.xlsx"
-    assert wait_for_s3_object(s3, BUCKET, excel_file), \
-        "Collection service never wrote to S3"
+    print("Checking for uploaded file in S3...", end="", flush=True)
+    excel_file = "boscar/crime_data.json"
+    assert wait_for_s3_object(s3, BUCKET, excel_file), "failed"
+    print("success")
 
     # data processing
+    print("Triggering data processing...", end="", flush=True)
     response = httpx.post(
-        f"{API_URL}/{PROCESSING_ROUTE}/process-data",
+        f"{API_URL}/{PROCESSING_ROUTE}/process-articles",
+        json={
+            "location": "Bondi",
+            "timeFrame": "1_per_month_5_years",
+            "category": "police"
+        },
+        headers={"Authorization": f"Bearer {STAGING_JWT}"},
+        timeout=TIMEOUT
+    )
+    assert response.status_code == 200, f"failed: {response.text}"
+    print("success")
+
+    # data retrieval
+    print("Retrieving data...", end="")
+    response = httpx.post(
+        f"{API_URL}/{RETRIEVAL_ROUTE}/lgas",
+    )
+    assert response.status_code == 200, "failed"
+    print("success")
+    data = response.json()
+    assert len(data) > 0
+    assert isinstance(data, dict)
+    assert "lgas" in data
+
+def test_e2e_articles(s3):
+    '''e2e test for articles'''
+    print("e2e: articles")
+
+    # data collection - upload articles
+    print("Uploading articles to collection endpoint...", end="", flush=True)
+    with open(EXCEL_FILE_PATH, "rb") as f:
+        response = httpx.post(
+            f"{API_URL}/{COLLECTION_ROUTE}/upload-articles",
+            headers={"Authorization": f"Bearer {STAGING_JWT}"},
+            timeout=TIMEOUT
+        )
+        assert response.status_code == 200, "failed"
+        print("success")
+
+    # data collection - check articles uploaded in s3
+    print("Checking for uploaded file in S3...", end="", flush=True)
+    excel_file = "boscar/crime_data.json"
+    assert wait_for_s3_object(s3, BUCKET, excel_file), "failed"
+    print("success")
+
+    # data collection - collect articles
+    print("Collecting articles...", end="", flush=True)
+    with open(EXCEL_FILE_PATH, "rb") as f:
+        response = httpx.get(
+            f"{API_URL}/{COLLECTION_ROUTE}/collect-articles",
+            headers={"Authorization": f"Bearer {STAGING_JWT}"},
+            timeout=TIMEOUT
+        )
+        assert response.status_code == 200, "failed"
+        print("success")
+        data = response.json()
+        assert len(data) > 0
+
+    # data processing - process articles
+    print("Triggering data processing...", end="", flush=True)
+    response = httpx.post(
+        f"{API_URL}/{PROCESSING_ROUTE}/process-articles",
         json={
             "location": "Sydney",
             "timeFrame": "1_per_month_1_year",
             "category": "crime"
         },
+        headers={"Authorization": f"Bearer {STAGING_JWT}"},
+        timeout=TIMEOUT
     )
-    assert response.status_code == 200
+    assert response.status_code == 200, f"failed: {response.text}"
+    print("success")
 
-    # # ── Step 4: Wait for processed data to land in S3 ───────────────────
-    # processed_key = "processed/crime_data.json"
-    # assert wait_for_s3_object(s3, STAGING_BUCKET, processed_key), \
-    #     "Processing service never wrote output to S3"
+    # # data processing - check for processed file in S3
+    print("Checking for processed file in S3...", end="", flush=True)
+    article_bucket = BUCKET + "/" + response.json().get("output_folder")
+    articles = s3.list_objects_v2(Bucket=article_bucket)
+    assert "Contents" in articles, f"No files found in {BUCKET}"
+    print("success")
+
+    # data processing - get processed articles
+    print("Getting processed articles...", end="", flush=True)
+    response = httpx.get(
+        f"{API_URL}/{PROCESSING_ROUTE}/processed-articles",
+        headers={"Authorization": f"Bearer {STAGING_JWT}"},
+        timeout=TIMEOUT
+    )
+    assert response.status_code == 200, f"failed: {response.text}"
+    print("success")
+    ### can add more here to check content
 
     # data retrieval
+    print("Running retrieval...", end="")
     response = httpx.post(
-        f"{API_URL}/{RETRIEVAL_ROUTE}/lgas",
+        f"{API_URL}/{RETRIEVAL_ROUTE}/run-retrieval",
     )
-    assert response.status_code == 200
+    assert response.status_code == 200, "failed"
+    print("success")
+
+    # specific lga
+    print("Getting LGA specific data for Bondi...", end="")
+    lga = "Waverley Council"
+    response = httpx.post(
+        f"{API_URL}/{RETRIEVAL_ROUTE}/lga/{lga}",
+    )
+    assert response.status_code == 200, "failed"
+    print("success")
+
+    # years
+    print("Getting LGA by year info...", end="")
+    response = httpx.post(
+        f"{API_URL}/{RETRIEVAL_ROUTE}/lga/{lga}/yearly",
+    )
+    assert response.status_code == 200, "failed"
+    print("success")
     data = response.json()
 
-    # ── Step 6: Assert the full chain produced correct output ────────────
+    # retrieval content checks
     assert len(data) > 0
-    assert isinstance(data, dict)
-    assert "lgas" in data
-
-def test_data_e2e(s3):
-    '''e2e test for articles'''
+    # assert isinstance(data, dict)
+    # assert "lgas" in data
