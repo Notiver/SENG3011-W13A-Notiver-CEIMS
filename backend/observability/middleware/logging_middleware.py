@@ -1,9 +1,10 @@
 import time
+import os
 from fastapi import Request
 from aws_lambda_powertools import Logger, Metrics
 from aws_lambda_powertools.metrics import MetricUnit
 
-logger = Logger(service="notiver")
+logger = Logger()
 metrics = Metrics(namespace="Notiver")
 
 start_time = time.time()

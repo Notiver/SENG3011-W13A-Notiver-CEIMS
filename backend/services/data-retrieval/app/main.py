@@ -18,7 +18,6 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 app.middleware("http")(observability_middleware)
-# metrics.set_default_dimensions(service="data-retrieval")
 
 app.add_middleware(
     CORSMiddleware,
