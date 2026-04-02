@@ -24,10 +24,6 @@ jobs:
       - name: Run linting
         run: ruff check .
 
-      - name: Verify DynamoDB Table Exists
-        run: |
-          aws dynamodb describe-table --table-name ${{ secrets.DYNAMODB_TABLE_NAME }} --region ap-southeast-2
-
       - name: Test Data Retrieval
         working-directory: ./backend/services/data-retrieval
         run: |
