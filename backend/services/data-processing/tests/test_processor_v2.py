@@ -34,9 +34,11 @@ def mock_classifiers():
         mock_crime.return_value = "Theft"
         yield mock_loc, mock_crime
 
-
-
-
+@pytest.fixture(autouse=True)
+def mock_tracer():
+    """Mocks the Powertools tracer so X-Ray doesn't crash local testing."""
+    with patch("app.services.processor_v2.tracer") as mock:
+        yield mock
 class TestFetchProcessedData:
     def test_fetch_success(self, mock_s3):
         # Mock S3 returning a valid JSON file

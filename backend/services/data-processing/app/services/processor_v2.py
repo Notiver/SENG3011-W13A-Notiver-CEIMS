@@ -20,7 +20,7 @@ except Exception:
 @tracer.capture_method
 def run_nlp_pipeline(job_id: str, user_id: str = "guest_user", auth_header: str = None, params: dict = None):    
     print("Loading RoBERTa sentiment model...")
-    with tracer.create_subsegment("Load_RoBERTa_Model"):
+    with tracer.provider.in_subsegment("Load_RoBERTa_Model"):        
         sentiment_task = pipeline(
             "sentiment-analysis", 
             model="cardiffnlp/twitter-roberta-base-sentiment-latest", 
