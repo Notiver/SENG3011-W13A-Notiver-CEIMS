@@ -14,6 +14,7 @@ export default function ScraperTab() {
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
   const [allLgas, setAllLgas] = useState([]);
   const [locationMode, setLocationMode] = useState<"global" | "ceims">("global");
+  const [processedIntelligence, setProcessedIntelligence] = useState<any | null>(null);
   
   const [showInterop, setShowInterop] = useState(false);
   
@@ -94,15 +95,17 @@ export default function ScraperTab() {
 
   const pollForJobResults = async (jobId: string) => {
     try {
-      // NOTE: You will need to add checkScrapeStatus to your api.ts file!
       const data = await api.checkScrapeStatus(jobId);
       
       if (data.status === "complete") {
-        setFullScrapedArticles(data.articles || []);
+        const realArticlesArray = Array.isArray(data.articles) 
+          ? data.articles 
+          : (data.articles?.articles || []);
+          
+        setFullScrapedArticles(realArticlesArray);
         setIsPolling(false);
         setLoading(false);
       } else if (data.status === "processing") {
-        // Background worker still going. Wait 5 seconds and knock again.
         setTimeout(() => pollForJobResults(jobId), 5000);
       } else {
         throw new Error("Unexpected status from polling.");
@@ -184,12 +187,16 @@ export default function ScraperTab() {
   };
 
   const handleProcess = async () => {
+    if (!currentJobId) return;
     setIsProcessing(true);
     setProcessStep(1);
 
     try {
-      await api.processArticles();
+      await api.processArticles(currentJobId);
       setProcessStep(2);
+
+      const finalData = await api.getProcessedArticles(currentJobId);
+      setProcessedIntelligence(finalData);
 
       await api.runRetrieval();
       setProcessStep(3);
@@ -216,6 +223,22 @@ export default function ScraperTab() {
     const a = document.createElement("a");
     a.href = url;
     a.download = `${selectedCategory}_articles_${new Date().toISOString().split('T')[0]}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadIntelligence = () => {
+    if (!processedIntelligence) return;
+
+    const jsonString = JSON.stringify(processedIntelligence, null, 2);
+    const blob = new Blob([jsonString], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `intelligence_report_${selectedCategory}_${new Date().toISOString().split('T')[0]}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -378,6 +401,15 @@ export default function ScraperTab() {
             className="bg-transparent border border-zinc-700 text-zinc-300 px-6 py-3 rounded-full font-bold hover:bg-zinc-800 hover:text-white transition-all flex items-center gap-2 animate-in fade-in"
           >
             <Download className="w-4 h-4" /> Download URLs
+          </button>
+        )}
+
+        {processStep >= 3 && processedIntelligence && (
+          <button 
+            onClick={handleDownloadIntelligence} 
+            className="bg-indigo-600 border border-indigo-500 text-white px-6 py-3 rounded-full font-bold hover:bg-indigo-500 transition-all flex items-center gap-2 animate-in fade-in"
+          >
+            <Download className="w-4 h-4" /> Download Intelligence (JSON)
           </button>
         )}
 
