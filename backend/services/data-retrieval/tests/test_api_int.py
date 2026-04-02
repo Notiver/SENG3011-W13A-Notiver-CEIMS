@@ -3,7 +3,7 @@ import boto3
 from fastapi.testclient import TestClient
 from moto import mock_aws
 from app.main import app
-from app.services.retriever import get_dynamodb_resource
+from utils.db_manager import get_db_environment
 from unittest.mock import patch
 
 client = TestClient(app)
@@ -13,13 +13,17 @@ def mock_db():
     """Sets up a Moto DynamoDB environment and seeds it with test data."""
     import os
     os.environ["AWS_DEFAULT_REGION"] = "us-east-1"
+    stage = "staging"
+
+    lga_overall_table = f'lga-overall-{stage}'
+    lga_by_year_table = f'lga-by-year-{stage}'
     
     with mock_aws():
         dynamodb = boto3.resource("dynamodb", region_name="us-east-1")
         
         # 1. Create and seed 'lga-overall'
         table_overall = dynamodb.create_table(
-            TableName='lga-overall',
+            TableName=lga_overall_table,
             KeySchema=[{'AttributeName': 'lga', 'KeyType': 'HASH'}],
             AttributeDefinitions=[{'AttributeName': 'lga', 'AttributeType': 'S'}],
             ProvisionedThroughput={'ReadCapacityUnits': 1, 'WriteCapacityUnits': 1}
@@ -30,7 +34,7 @@ def mock_db():
         
         # 2. Create and seed 'lga-by-year'
         table_yearly = dynamodb.create_table(
-            TableName='lga-by-year',
+            TableName=lga_by_year_table,
             KeySchema=[
                 {'AttributeName': 'lga', 'KeyType': 'HASH'},
                 {'AttributeName': 'year', 'KeyType': 'RANGE'}
@@ -46,7 +50,10 @@ def mock_db():
         )
         
         # Override FastAPI dependency
-        app.dependency_overrides[get_dynamodb_resource] = lambda: dynamodb
+        app.dependency_overrides[get_db_environment] = lambda: {
+            "db": dynamodb,
+            "stage": stage
+        }
         yield dynamodb
         app.dependency_overrides.clear()
 
@@ -117,7 +124,10 @@ class BrokenDB:
 def test_dynamodb_500_exceptions():
     """Injects a broken DB to ensure all routes gracefully catch and return 500 errors."""
     # Temporarily override the dependency with our broken DB
-    app.dependency_overrides[get_dynamodb_resource] = lambda: BrokenDB()
+    app.dependency_overrides[get_db_environment] = lambda: {
+        "db": BrokenDB(),
+        "stage": "staging"
+    }
     
     # Test /lgas exception
     resp_all = client.get("/lgas")
