@@ -13,38 +13,39 @@ tracer = Tracer(service="data-processing")
 
 try:
     session = boto3.Session(profile_name=config.PROFILE_NAME)
-    s3 = session.client('s3', region_name=config.REGION)
+    s3 = session.client('s3', region_name=config.REGION if hasattr(config, 'REGION') else "ap-southeast-2")
 except Exception:
-    s3 = boto3.client('s3', region_name=config.REGION)
+    s3 = boto3.client('s3', region_name=config.REGION if hasattr(config, 'REGION') else "ap-southeast-2")
 
 @tracer.capture_method
-def run_nlp_pipeline(params: dict = None, user_id: str = "guest"):    
+def run_nlp_pipeline(job_id: str, user_id: str = "guest_user", auth_header: str = None, params: dict = None):    
     print("Loading RoBERTa sentiment model...")
-    sentiment_task = pipeline(
-        "sentiment-analysis", 
-        model="cardiffnlp/twitter-roberta-base-sentiment-latest", 
-        top_k=None
-    )
+    with tracer.provider.in_subsegment("Load_RoBERTa_Model"):        
+        sentiment_task = pipeline(
+            "sentiment-analysis", 
+            model="cardiffnlp/twitter-roberta-base-sentiment-latest", 
+            top_k=None
+        )
 
-    collection_url = config.DATA_COLLECTION_URL
-    print(f"Triggering collection at {collection_url} with params: {params}")
+    base_url = config.DATA_COLLECTION_URL.rstrip('/')
+    target_api_url = f"{base_url}/{job_id}"
+    print(f"Fetching scraped data from API: {target_api_url}")
+    
+    headers = {"Authorization": auth_header} if auth_header else {}
     
     try:
-        payload_request = params or {
-            "location": "Sydney, Australia",
-            "timeFrame": "5_per_month_1_year",
-            "category": "crime"
-        }
-        
-        response = requests.post(collection_url, json=payload_request, timeout=60)
+        response = requests.get(target_api_url, headers=headers, timeout=30)
         response.raise_for_status()
         payload = response.json()
     except Exception as e:
-        return {"status": "error", "message": f"Failed to reach collection service: {e}"}
+        return {"status": "error", "message": f"Failed to fetch from collection API: {e}"}
         
+    if payload.get("status") != "complete":
+        return {"status": "error", "message": f"Scrape job is not complete yet. Current status: {payload.get('status')}"}
+
     articles = payload.get("articles", [])
     if not articles:
-        return {"status": "success", "message": "No articles found for these parameters."}
+        return {"status": "success", "message": "No articles found in the scraped data."}
 
     processed_data = []
     skipped_count = 0
@@ -68,9 +69,7 @@ def run_nlp_pipeline(params: dict = None, user_id: str = "guest"):
             
             sentiment_results = sentiment_task(text_content[:1500])
             scores = {res['label']: round(res['score'], 4) for res in sentiment_results[0]}
-            
             negative_sentiment = scores.get('negative', 0)
-
             base_id = file_key.split('/')[-1].replace('.txt', '') if file_key else "unknown"
             
             entry = {
@@ -84,41 +83,69 @@ def run_nlp_pipeline(params: dict = None, user_id: str = "guest"):
                 "postcode": loc['postcode'],
                 "url": article.get("url", "")
             }
-
             processed_data.append(entry)
             
         except Exception as e:
             print(f"Error processing {file_key}: {e}")
 
+    bulk_s3_key = None
     if processed_data:
         try:
-            final_json_data = json.dumps(processed_data, indent=4)
-            bulk_s3_key = f"users/{user_id}/{config.NLP_BUCKET_NAME}/all_processed_articles.json"
+            # For Communal CEIMS article Archive - Check if this is a CEIMS job from frontend
+            is_ceims = params.get("is_ceims", False) if params else False
             
+            if is_ceims:
+                ceims_s3_key = "public/ceims/all_processed_articles.json"
+                existing_data = []
+                
+                # Attempt to download the existing public file
+                try:
+                    existing_obj = s3.get_object(Bucket=config.S3_BUCKET_NAME, Key=ceims_s3_key)
+                    existing_data = json.loads(existing_obj['Body'].read().decode('utf-8'))
+                except Exception:
+                    print("No existing CEIMS master file found. Creating a new one.")
+                
+                # Append new articles
+                existing_data.extend(processed_data)
+                
+                # Filter out duplicate articles
+                unique_data = {item['object_id']: item for item in existing_data}.values()
+                
+                final_json_data = json.dumps(list(unique_data), indent=4)
+                bulk_s3_key = ceims_s3_key
+                
+            else:
+                # Private User Data (London, Tokyo, etc.)
+                final_json_data = json.dumps(processed_data, indent=4)
+                bulk_s3_key = f"users/{user_id}/processed_intelligence/{job_id}_processed.json"
+            
+            # Upload the file to the chosen path
             s3.put_object(
                 Bucket=config.S3_BUCKET_NAME,
                 Key=bulk_s3_key,
                 Body=final_json_data,
                 ContentType='application/json'
             )
-            print(f"Uploaded analysis for {user_id} to: {bulk_s3_key}")
+            print(f"Uploaded analysis to: {bulk_s3_key}")
+            
         except Exception as e:
             print(f"S3 Upload failed: {e}")
 
     return {
         "status": "success", 
         "processed": len(processed_data), 
-        "skipped": skipped_count
+        "skipped": skipped_count,
+        "s3_key": bulk_s3_key
     }
 
 @tracer.capture_method
-def fetch_processed_data():
-    bulk_s3_key = f"{config.NLP_BUCKET_NAME}/all_processed_articles.json"
+def fetch_processed_data(job_id: str, user_id: str = "guest_user"):
+    bulk_s3_key = f"users/{user_id}/processed_intelligence/{job_id}_processed.json"
     
     try:
         response = s3.get_object(Bucket=config.S3_BUCKET_NAME, Key=bulk_s3_key)
         return json.loads(response['Body'].read().decode('utf-8'))
     except s3.exceptions.NoSuchKey:
-        return {"error": "Pipeline has not been run yet."}
+        return {"error": "Processed data not found for this job."}
     except Exception as e:
         raise Exception(f"S3 Read Error: {str(e)}")
