@@ -1,5 +1,4 @@
 import time
-import os
 from fastapi import Request
 from aws_lambda_powertools import Logger, Metrics
 from aws_lambda_powertools.metrics import MetricUnit
