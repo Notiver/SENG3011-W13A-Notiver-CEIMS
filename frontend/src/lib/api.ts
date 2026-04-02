@@ -56,11 +56,11 @@ export const api = {
     fetchAPI(`/data-collection/collect-articles/${jobId}`, { method: "GET" }),
 
   // --- DATA PROCESSING (NLP) ---
-  processArticles: () => 
-    fetchAPI("/data-processing/process-articles", { method: "POST" }),
+  processArticles: (jobId: string) => 
+    fetchAPI(`/data-processing/process-articles/${jobId}`, { method: "POST" }),
     
-  getProcessedArticles: () => 
-    fetchAPI("/data-processing/processed-articles", { method: "GET" }),
+  getProcessedArticles: (jobId: string) => 
+    fetchAPI(`/data-processing/processed-articles/${jobId}`, { method: "GET" }),
 
   // --- DATA RETRIEVAL ---
   runRetrieval: () => 

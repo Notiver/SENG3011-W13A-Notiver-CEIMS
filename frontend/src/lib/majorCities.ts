@@ -1,5 +1,6 @@
 export const MAJOR_CITIES = [
-  "NSW, Australia (CEIMS)",
+  "Sydney, Australia",
+  "New York, USA",
   "London, UK",
   "Dubai, UAE",
   "Tehran, Iran",
