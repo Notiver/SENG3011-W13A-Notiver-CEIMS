@@ -2,6 +2,8 @@
 
 This repository contains React frontend and FastAPI NLP backend we will spend the next 9 weeks contributing to.
 
+Live link: [Notiver CEIMS](https://main.d2exnodyaugt1a.amplifyapp.com/)
+
 ## Tech Stack (v1)
 * Frontend: Next.js (React), TypeScript, Tailwind CSS
 * Backend: Python 3.10+, FastAPI, Uvicorn

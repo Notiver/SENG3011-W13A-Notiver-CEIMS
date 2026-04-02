@@ -2,77 +2,123 @@ import requests
 import newspaper
 import boto3
 import os
-from datetime import datetime
+import traceback
+import calendar
+from datetime import datetime, timedelta
 from app import config
+from aws_lambda_powertools import Tracer
 
-CATEGORY_MAP = {
-    "crime": "(police OR crime OR murder OR theft)",
-    "housing": "(housing OR real estate OR property prices OR rent)",
-    "lifestyle": "(lifestyle OR culture OR events OR community)",
-    "jobs": "(jobs OR employment OR economy OR hiring)",
-    "stocks": "(stocks OR asx OR finance OR markets)",
-    "weather": "(weather OR forecast OR storm OR flood)",
-    "geopolitics": "(geopolitics OR foreign policy OR international relations)",
-    "climate": "(climate change OR environment OR emissions)"
+tracer = Tracer(service="data-collection")
+
+CATEGORY_CONFIG = {
+    "crime": {"query": "(police OR crime OR murder OR theft)", "section": "news|world|australia-news|uk-news"},
+    "housing_prices": {"query": "(housing OR real estate OR property OR rent)", "section": "business|money|society"},
+    "lifestyle": {"query": "(lifestyle OR culture OR events OR community)", "section": "lifeandstyle|culture"},
+    "job_opportunities": {"query": "(jobs OR employment OR economy OR hiring)", "section": "business|money"},
+    "stocks": {"query": '("stock market" OR shares OR asx OR finance OR equities)', "section": "business|money"},
+    "weather": {"query": "(weather OR forecast OR storm OR flood)", "section": "news|environment"},
+    "geopolitics": {"query": "(geopolitics OR foreign policy OR international relations)", "section": "world|politics"},
+    "climate": {"query": "(climate change OR environment OR emissions)", "section": "environment|science"}
 }
 
+@tracer.capture_method
 def run_dynamic_scraper(location: str, time_frame: str, category: str, user_id: str = "guest_user"):
-    """
-    Fetches article URLs based on user parameters and scrapes content 
-    directly into a user-specific S3 folder.
-    """
-    print(f"Starting dynamic scrape for User: {user_id} | Loc: {location} | Cat: {category}")
+    print(f"Starting dynamic scrape for User: {user_id} | Loc: {location} | Cat: {category} | Time: {time_frame}")
     
-    # 1. Build Query
-    keywords = CATEGORY_MAP.get(category, category)
-    search_query = f'"{location}" AND {keywords}'
+    cat_config = CATEGORY_CONFIG.get(category, {"query": category, "section": None})
     
-    current_year = datetime.now().year
-    start_year = current_year
-    page_size = 1
+    clean_location = location.replace(", ", " AND ")
+    search_query = f'({clean_location}) AND {cat_config["query"]}'
     
-    # Logic for timeframe parameters
+    current_date = datetime.now()
+    api_queries = []
+    
     if time_frame == "1_per_month_5_years":
-        start_year = current_year - 4
-        page_size = 1
+        for i in range(60):
+            target_month = current_date.month - i
+            target_year = current_date.year
+            while target_month <= 0:
+                target_month += 12
+                target_year -= 1
+            
+            _, last_day = calendar.monthrange(target_year, target_month)
+            api_queries.append({
+                "from_date": f"{target_year}-{target_month:02d}-01",
+                "to_date": f"{target_year}-{target_month:02d}-{last_day:02d}",
+                "page_size": 1
+            })
+
     elif time_frame == "5_per_month_1_year":
-        start_year = current_year
-        page_size = 5
+        for i in range(12):
+            target_month = current_date.month - i
+            target_year = current_date.year
+            while target_month <= 0:
+                target_month += 12
+                target_year -= 1
+                
+            _, last_day = calendar.monthrange(target_year, target_month)
+            api_queries.append({
+                "from_date": f"{target_year}-{target_month:02d}-01",
+                "to_date": f"{target_year}-{target_month:02d}-{last_day:02d}",
+                "page_size": 5
+            })
+
     elif time_frame == "1_per_day_1_month":
-        start_year = current_year
-        page_size = 30 
-        
+        for i in range(30):
+            target_date = current_date - timedelta(days=i)
+            date_str = target_date.strftime("%Y-%m-%d")
+            api_queries.append({
+                "from_date": date_str,
+                "to_date": date_str,
+                "page_size": 1
+            })
+    else:
+        api_queries.append({
+            "from_date": f"{current_date.year}-01-01",
+            "to_date": f"{current_date.year}-12-31",
+            "page_size": 5
+        })
+
     url = "https://content.guardianapis.com/search"
     api_key = os.getenv("GUARDIAN_API_KEY", "test")    
     article_urls = []
     
-    for year in range(start_year, current_year + 1):
+    for q in api_queries:
         params = {
             "q": search_query,
-            "section": "australia-news",      
-            "from-date": f"{year}-01-01",        
-            "to-date": f"{year}-12-31",          
-            "page-size": page_size,                   
-            "api-key": api_key                 
+            "from-date": q["from_date"],        
+            "to-date": q["to_date"],          
+            "page-size": q["page_size"],                   
+            "api-key": api_key,
+            "order-by": "relevance"
         }
         
+        if cat_config["section"]:
+            params["section"] = cat_config["section"]
+            
         try:
             response = requests.get(url, params=params, timeout=10)
             if response.status_code == 200:
                 results = response.json().get("response", {}).get("results", [])
                 for item in results:
                     article_urls.append(item.get('webUrl'))
+            else:
+                print(f"API ERROR {response.status_code}: {response.text}")
+                print(f"DEBUG URL: {response.url}")
         except Exception as e:
-            print(f"Guardian API Request failed for {year}: {e}")
+            print(f"Guardian API Request failed for {q['from_date']}: {e}")
+
+    # Remove duplicates just in case Guardian returns the same article across boundaries
+    article_urls = list(set(article_urls))
 
     print(f"Found {len(article_urls)} URLs. Scraping content...")
 
-
     try:
-        session = boto3.Session(profile_name=config.PROFILE_NAME)
-        s3 = session.client('s3', region_name=config.REGION)
-    except Exception:
-        s3 = boto3.client('s3', region_name=config.REGION)
+        s3 = boto3.client('s3')
+    except Exception as e:
+        print(f"CRITICAL: Failed to initialize Boto3: {e}")
+        print(traceback.format_exc())
+        raise e
 
     scraped_data = []
 
@@ -101,6 +147,7 @@ def run_dynamic_scraper(location: str, time_frame: str, category: str, user_id: 
                     "metadata": {"publish_date": datetime.now().isoformat()}
                 })
         except Exception as e:
-            print(f"Failed to process {article_url}: {e}")
+            print(f"FAILED ON ARTICLE {article_url}: {e}")
+            print(traceback.format_exc())
 
     return scraped_data

@@ -3,9 +3,12 @@ import pandas as pd
 from fastapi import UploadFile, File, HTTPException
 from datetime import date
 from app import config
-
 from app.models import Event, CrimeDataExport
+from aws_lambda_powertools import Tracer
 
+tracer = Tracer(service="data-collection")
+
+@tracer.capture_method
 def process_data(my_file: UploadFile = File(...))-> str:
     """Processes the uploaded Excel file, cleans and transforms the data, and returns it as JSON."""
     
