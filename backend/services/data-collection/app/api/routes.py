@@ -4,6 +4,7 @@ import json
 import base64
 import boto3
 import uuid
+import botocore
 
 from fastapi import APIRouter, HTTPException, UploadFile, File, Request
 from pydantic import BaseModel
@@ -151,3 +152,28 @@ def post_dynamic_articles(request: ScrapeRequest, fast_request: Request):
     except Exception as e:
         print(f"Failed to send to SQS: {e}")
         raise HTTPException(status_code=500, detail="Failed to queue scraping job.")
+    
+@router.get("/collect-articles/{job_id}")
+def check_job_status(job_id: str, fast_request: Request):
+    user_id = get_user_id(fast_request) 
+    
+    s3_key = f"users/{user_id}/jobs/{job_id}.json"
+    s3_client = boto3.client('s3', region_name=config.REGION if hasattr(config, 'REGION') else "ap-southeast-2")
+    
+    try:
+        response = s3_client.get_object(Bucket=config.S3_BUCKET_NAME, Key=s3_key)
+        file_content = response['Body'].read().decode('utf-8')
+        articles = json.loads(file_content)
+        
+        return {
+            "status": "complete",
+            "job_id": job_id,
+            "count": len(articles),
+            "articles": articles
+        }
+        
+    except botocore.exceptions.ClientError as e:
+        if e.response['Error']['Code'] == 'NoSuchKey':
+            return {"status": "processing", "message": "Still scraping, check back soon!"}
+        else:
+            raise HTTPException(status_code=500, detail="Error checking S3.")

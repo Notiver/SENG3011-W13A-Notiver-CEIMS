@@ -10,6 +10,6 @@ def create_bucket(user_id):
         if region != 'us-east-1':
             bucket_config['CreateBucketConfiguration'] = {'LocationConstraint': region}
 
-        s3_client.create_bucket(Bucket=f"notiver-CEIMS-{user_id}", **bucket_config)
+        s3_client.create_bucket(Bucket=f"notiver-{user_id}", **bucket_config)
     except ClientError as e:
         print(f"Error creating s3 bucket: {e}")

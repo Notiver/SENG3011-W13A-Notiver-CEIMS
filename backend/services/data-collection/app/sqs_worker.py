@@ -1,7 +1,7 @@
 import json
 import boto3
 import traceback
-from services.scraper_v2 import run_dynamic_scraper
+from app.services.scraper_v2 import run_dynamic_scraper
 from app import config
 
 s3_client = boto3.client('s3')

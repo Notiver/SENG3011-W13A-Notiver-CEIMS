@@ -1,7 +1,7 @@
 import { fetchAuthSession } from 'aws-amplify/auth';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
-// const BASE_URL = "http://127.0.0.1:8000"; Local testing
+// const BASE_URL = "http://127.0.0.1:8000";
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
   try {
@@ -50,17 +50,17 @@ async function fetchAPI(endpoint: string, options: RequestInit = {}) {
 export const api = {
   // --- DATA COLLECTION ---
   collectArticles: (params: { location: string; timeFrame: string; category: string }) => 
-    fetchAPI("/data-collection/collect-articles", {
-      method: "POST",
-      body: JSON.stringify(params)
-    }),
+    fetchAPI("/data-collection/collect-articles", { method: "POST", body: JSON.stringify(params) }),
+
+  checkScrapeStatus: (jobId: string) => 
+    fetchAPI(`/data-collection/collect-articles/${jobId}`, { method: "GET" }),
 
   // --- DATA PROCESSING (NLP) ---
-  processArticles: () => 
-    fetchAPI("/data-processing/process-articles", { method: "POST" }),
+  processArticles: (jobId: string) => 
+    fetchAPI(`/data-processing/process-articles/${jobId}`, { method: "POST" }),
     
-  getProcessedArticles: () => 
-    fetchAPI("/data-processing/processed-articles", { method: "GET" }),
+  getProcessedArticles: (jobId: string) => 
+    fetchAPI(`/data-processing/processed-articles/${jobId}`, { method: "GET" }),
 
   // --- DATA RETRIEVAL ---
   runRetrieval: () => 
