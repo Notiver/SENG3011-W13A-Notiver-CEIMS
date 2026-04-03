@@ -1,0 +1,462 @@
+openapi: 3.1.0
+# Added by API Auto Mocking Plugin
+info:
+  description: This documents the 3 APIs in our microservices which are data collection, data pre-processing and data retrieval for manipulating event datasets.
+  version: "1.0.0"
+  title: Notiver Data API
+  contact:
+    email: z5422360@ad.unsw.edu.au
+  license:
+    name: Apache 2.0
+    url: 'http://www.apache.org/licenses/LICENSE-2.0.html'
+tags:
+  - name: Data Collection
+    description: Collects statistical data and article data
+  - name: Data Processing (NLP)
+    description: Processes article data to produce an analysis
+  - name: Data Processing and Retrieval
+    description: Processes statistical and article data and fetches from the db
+  - name: General
+    # description: Other routes.
+paths:
+  /:
+    get:
+      tags:
+        - General
+      summary: Get homepage
+      operationId: homepage
+      description: This endpoint fetches the homepage of the microservice.
+      responses:
+        '200':
+          description: Successfully reached the homepage
+          content:
+            application/json:
+              schema:
+                type: string
+                example: "Welcome to Notiver's homepage!"
+        '404':
+          description: Page not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /upload-data:
+    post:
+      tags:
+        - Data Collection
+      summary: Uploads and process data
+      operationId: uploadData
+      description: This endpoint takes an Excel file input in the specified format, then parses and uploads it to the configured S3 bucket.
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "Upload an Excel file (.xlsx or .xls) to be processed."
+      responses:
+        '200':
+          description: Successful upload
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "File 'file.xlsx' processed and uploaded successfully!"
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /collect-data:
+    get:
+      tags:
+        - Data Collection
+      summary: Download collected data
+      operationId: collectData
+      description: This endpoint collects data from the configured S3 bucket for download.
+      responses:
+        '200':
+          description: Successfully collected file for download
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+              # example: 'download link'
+
+        '404':
+          description: Error finding file (bad request)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /upload-articles:
+    post:
+      tags:
+        - Data Collection
+      summary: Uploads and process articles from The Guardian
+      operationId: uploadArticles
+      description: Pulls articles from the Guardian to upload.
+      # requestBody:
+      responses:
+        '200':
+          description: Successful upload
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "success"
+                  message:
+                    type: string
+                    example: "Articles collected and processed successfully."
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /collect-articles:
+    get:
+      tags:
+        - Data Collection
+      summary: Download collected articles
+      operationId: collectArticles
+      description: Returns the collected Guardian articles as a download.
+      responses:
+        '200':
+          description: Successfully collected articles for download
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: 
+                  status:
+                    type: string
+                    example: "success"
+                  count:
+                    type: integer
+                    example: 60
+                  articles:
+                    type: array
+                    items:
+                      type: object 
+                      properties:
+                        file_key:
+                          type: string
+                          example: "file_key"
+                        content:
+                          type: string
+                          example: "article content"
+                        metadata:
+                          type: string
+                          example: "file metadata"
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /process-articles:
+    post:
+      tags:
+        - Data Processing (NLP)
+      summary: Trigger NLP processing pipeline
+      operationId: processArticles
+      description: >
+        Triggers the internal NLP processing pipeline. The pipeline retrieves raw
+        article data from S3, applies natural language processing (e.g. sentiment analysis),
+        and stores the processed results for downstream services.
+      responses:
+        '200':
+          description: Pipeline executed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                oneOf:
+                  - type: object
+                    properties:
+                      status:
+                        type: string
+                        example: "success"
+                      processed:
+                        type: integer
+                        example: 15
+                      skipped:
+                        type: integer
+                        example: 2
+                  - type: object
+                    properties:
+                      status:
+                        type: string
+                        example: "success"
+                      message:
+                        type: string
+                        example: "No articles found in bucket."
+        '500':
+          description: Pipeline execution failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /processed-articles:
+    get:
+      tags:
+        - Data Processing (NLP)
+      summary: Retrieve processed articles
+      operationId: processedArticles
+      description: >
+        Returns processed article data after NLP has been applied. Data is retrieved
+        from internal storage (e.g. S3 or database) via the fetch_processed_data() function.
+      responses:
+        '200':
+          description: Successfully retrieved processed articles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    object_id:
+                      type: string
+                      example: "9news_article_456"
+                    source_type:
+                      type: string
+                      example: "news"
+                    offence_type:
+                      type: string
+                      example: "Theft"
+                    sentiment_score:
+                      type: number
+                      format: float
+                      example: 0.4121
+                    when:
+                      type: string
+                      format: date-time
+                      example: "2022-08-01T09:15:00.000000"
+                    suburb:
+                      type: string
+                      example: "Redfern"
+                    lga:
+                      type: string
+                      example: "City Of Sydney"
+                    postcode:
+                      type: string
+                      example: "2016"
+        '404':
+          description: Processed data not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Fetch error during retrieval
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /run-retrieval:
+    post:
+      tags:
+        - Data Processing and Retrieval
+      summary: Retrieves and processes data scores to put in DynamoDB
+      operationId: runRetrieval
+      description: This endpoint fetches processed article data from the Data Processing (NLP), aggregates suburb data into LGA statistics, calculates sentiment and statistical crime scores before finally storing the aggregated data into DynamoDB tables (lga-overall, lga-by-year). 
+      responses:
+        '200':
+          description: Successfully ran pipeline
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Retrieval pipeline completed successfully"
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /lgas:
+    get:
+      tags:
+        - Data Processing and Retrieval
+      summary: Get all LGAs
+      operationId: getAllLGAs
+      description: Retrieves a list of all Local Government Areas stored in the database.
+      responses:
+        '200':
+          description: Successfully retrieved LGAs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  lgas:
+                    type: array
+                    items:
+                      type: string
+                    example: ["Sydney", "Parramatta", "Blacktown"]
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /lga/{lga}:
+    get:
+      tags:
+        - Data Processing and Retrieval
+      summary: Get LGA statistics
+      operationId: getLGAStats
+      description: >
+        Retrieves overall statistics for a specified LGA.
+      parameters:
+        - name: lga
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Name of the Local Government Area
+      responses:
+        '200':
+          description: Successfully retrieved LGA data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  overall:
+                    type: object
+                    properties:
+                      lga:
+                        type: string
+                      sentiment_score:
+                        type: number
+                        example: 0.50
+                      statistical_score:
+                        type: number
+                        example: 10.0
+                      total_crimes:
+                        type: integer
+                        example: 520
+                      total_articles:
+                        type: integer
+                        example: 25
+        '404':
+          description: LGA not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /lga/{lga}/yearly:
+    get:
+      tags:
+        - Data Processing and Retrieval
+      summary: Get yearly statistics for an LGA
+      operationId: getLGAYearlyStats
+      description: Retrieves year-by-year crime and sentiment statistics for a specified LGA.
+      parameters:
+        - name: lga
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Name of the Local Government Area
+      responses:
+        '200':
+          description: Successfully retrieved yearly data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    year:
+                      type: integer
+                      example: 2023
+                    sentiment:
+                      type: number
+                    stats:
+                      type: number
+                    total:
+                      type: integer
+                    violent:
+                      type: integer
+                    theft:
+                      type: integer
+                    property:
+                      type: integer
+                    drugs:
+                      type: integer
+                    judicial:
+                      type: integer
+                    other:
+                      type: integer
+        '404':
+          description: LGA not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: A human-readable error message.
