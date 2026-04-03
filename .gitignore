@@ -5,7 +5,6 @@ ml_models/
 data/
 .DS_Store
 node_modules/
-dist/
 build/
 target/
 .env.*
