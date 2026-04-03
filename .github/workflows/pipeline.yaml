@@ -163,6 +163,26 @@ jobs:
           aws lambda update-alias --function-name data-nlp-analytics --name staging --function-version \$LATEST
           aws lambda update-alias --function-name data-retrieval-function --name staging --function-version \$LATEST
 
+      - name: Grant API Gateway permission to invoke Staging Aliases
+        run: |
+          aws lambda add-permission \
+            --function-name data-collection-function:staging \
+            --statement-id AllowAPIGatewayInvokeStaging \
+            --action lambda:InvokeFunction \
+            --principal apigateway.amazonaws.com || true
+            
+          aws lambda add-permission \
+            --function-name data-nlp-analytics:staging \
+            --statement-id AllowAPIGatewayInvokeStaging \
+            --action lambda:InvokeFunction \
+            --principal apigateway.amazonaws.com || true
+            
+          aws lambda add-permission \
+            --function-name data-retrieval-function:staging \
+            --statement-id AllowAPIGatewayInvokeStaging \
+            --action lambda:InvokeFunction \
+            --principal apigateway.amazonaws.com || true
+
       - name: Inject AWS Account ID into OpenAPI spec
         run: |
           sed -i "s/\${AWS_ACCOUNT_ID}/${{ secrets.AWS_ACCOUNT_ID }}/g" backend/infrastructure/openapi.yaml
@@ -202,6 +222,12 @@ jobs:
           aws lambda update-alias --function-name data-collection-function --name production --function-version $STAGING_VER
           aws lambda update-alias --function-name data-nlp-analytics --name production --function-version $STAGING_VER
           aws lambda update-alias --function-name data-retrieval-function --name production --function-version $STAGING_VER
+
+      - name: Grant API Gateway permission to invoke Production Aliases
+        run: |
+          aws lambda add-permission --function-name data-collection-function:production --statement-id AllowAPIGatewayInvokeProd --action lambda:InvokeFunction --principal apigateway.amazonaws.com || true
+          aws lambda add-permission --function-name data-nlp-analytics:production --statement-id AllowAPIGatewayInvokeProd --action lambda:InvokeFunction --principal apigateway.amazonaws.com || true
+          aws lambda add-permission --function-name data-retrieval-function:production --statement-id AllowAPIGatewayInvokeProd --action lambda:InvokeFunction --principal apigateway.amazonaws.com || true
 
       - name: Create API Deployment
         run: |
