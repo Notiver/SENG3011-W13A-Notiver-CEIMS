@@ -9,7 +9,7 @@ metrics = Metrics(namespace="Notiver", service="notiver")
 start_time = time.time()
 
 async def observability_middleware(request: Request, call_next):
-    if request.method == "OPTIIONS":
+    if request.method == "OPTIONS":
         return await call_next(request)
     start = time.time()
 
