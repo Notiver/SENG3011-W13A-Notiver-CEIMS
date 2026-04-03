@@ -5,6 +5,7 @@ from app.api.routes import router
 from mangum import Mangum
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 from observability.middleware.rate_limiter import limiter
 from observability.middleware.logging_middleware import observability_middleware
 from aws_lambda_powertools import Metrics, Tracer
@@ -19,6 +20,7 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # metrics.set_default_dimensions(service="data-retrieval")
+app.add_middleware(SlowAPIMiddleware)
 
 app.add_middleware(
     CORSMiddleware,

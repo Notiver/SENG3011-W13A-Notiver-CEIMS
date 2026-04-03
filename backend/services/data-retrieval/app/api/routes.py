@@ -1,6 +1,8 @@
+import requests
 from fastapi import APIRouter, HTTPException, Depends
 from app.services.retriever import process_retrieval
 from utils.db_manager import get_db_environment
+from app import config
 
 router = APIRouter()
 
@@ -55,7 +57,28 @@ def get_all_lgas(env=Depends(get_db_environment)):
         return {"lgas": lgas}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
 
+@router.get("/public/ceims-articles")
+def get_public_ceims_articles():
+    """Fetches the unified CEIMS data from the Data Processing API."""
+    
+    base_url = config.DATA_PROCESSING_URL.rstrip('/')
+    target_api_url = f"{base_url}/public/ceims-articles"
+    
+    try:
+        response = requests.get(target_api_url, timeout=15)
+        response.raise_for_status()
+        articles = response.json()
+        
+        return {
+            "status": "success",
+            "count": len(articles),
+            "articles": articles
+        }
+    except Exception as e:
+        print(f"Failed to fetch public CEIMS data from Processing API: {e}")
+        return {"status": "success", "count": 0, "articles": []}
 
 if __name__ == "__main__":
     run_retrieval()

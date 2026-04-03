@@ -11,7 +11,7 @@ from aws_lambda_powertools import Tracer
 tracer = Tracer(service="data-collection")
 
 CATEGORY_CONFIG = {
-    "crime": {"query": "(police OR crime OR murder OR theft)", "section": "news|world|australia-news|uk-news"},
+    "crime": {"query": "(police OR crime OR murder OR theft)", "section": "news|world|australia-news"},
     "housing_prices": {"query": "(housing OR real estate OR property OR rent)", "section": "business|money|society"},
     "lifestyle": {"query": "(lifestyle OR culture OR events OR community)", "section": "lifeandstyle|culture"},
     "job_opportunities": {"query": "(jobs OR employment OR economy OR hiring)", "section": "business|money"},
