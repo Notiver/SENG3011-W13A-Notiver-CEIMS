@@ -1,4 +1,3 @@
-import boto3
 import app.config as config
 import requests
 
@@ -6,26 +5,22 @@ from collections import defaultdict
 from utils.lga_format_dict import LGA_FORMAT_MAP
 from utils.crime_dict import CRIME_CATEGORY_MAP, CRIME_WEIGHTS
 from utils.LGAData import get_lga_population
+from utils.db_manager import get_dynamodb_resource
 from decimal import Decimal
+from aws_lambda_powertools import Tracer
+
+tracer = Tracer(service="data-retrieval")
 
 class PipelineError(Exception):
     pass
 
-def get_dynamodb_resource():
-    """Function to initialize the resource."""
-    try:
-        session = boto3.Session(profile_name=config.PROFILE_NAME)
-        return session.resource('dynamodb', region_name=config.REGION)
-    except Exception:
-        return boto3.resource('dynamodb', region_name=config.REGION)
-
-
-def process_retrieval(dynamodb_resource=None):
+@tracer.capture_method
+def process_retrieval(dynamodb_resource=None, stage="staging"):
     if not dynamodb_resource:
         dynamodb_resource = get_dynamodb_resource()
     
-    lga_overall_table = dynamodb_resource.Table('lga-overall')
-    lga_by_year_table = dynamodb_resource.Table('lga-by-year')
+    lga_overall_table = dynamodb_resource.Table(f'lga-overall-{stage}')
+    lga_by_year_table = dynamodb_resource.Table(f'lga-by-year-{stage}')
 
     # 1. Fetch data 
     all_article_events, article_events_by_year = process_articles()
@@ -61,7 +56,7 @@ def process_retrieval(dynamodb_resource=None):
         lga_by_year_table
     )
 
-
+@tracer.capture_method
 def process_articles():
     all_article_events = []
     article_events_by_year = defaultdict(list)
@@ -82,7 +77,7 @@ def process_articles():
 
     return all_article_events, article_events_by_year
 
-
+@tracer.capture_method
 def process_statistics():
     all_lga_stats = []
     lga_stats_by_year = defaultdict(list)
@@ -111,7 +106,7 @@ def process_statistics():
 
     return all_lga_stats, lga_stats_by_year
 
-
+@tracer.capture_method
 def upload_lga_overall_data(lga_sentiment_scores_all, lga_statistical_scores_all, lga_total_crimes, lga_total_articles, lga_overall_table):
     table_entries = defaultdict(lambda: {
         "sentiment_score": 0,
@@ -147,7 +142,7 @@ def upload_lga_overall_data(lga_sentiment_scores_all, lga_statistical_scores_all
         for item in data:
             writer.put_item(Item=item)
 
-
+@tracer.capture_method
 def upload_lga_by_year_data(lga_stats_by_year, article_events_by_year, lga_by_year_table):
     table_entries = defaultdict(lambda: {
         "sentiment": 0,
@@ -279,7 +274,3 @@ def stat_score(lga_stats):
 
 
     return stat_scores
-
-
-if __name__ == "__main__":
-    process_retrieval()

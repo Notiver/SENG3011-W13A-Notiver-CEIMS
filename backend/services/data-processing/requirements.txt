@@ -8,6 +8,7 @@ attrs==25.4.0
 automaton==3.3.0
 autopage==0.6.0
 aws-lambda-powertools
+aws-xray-sdk
 bcrypt==5.0.0
 beautifulsoup4==4.14.3
 boto3==1.42.64

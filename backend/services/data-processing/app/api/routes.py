@@ -1,11 +1,10 @@
 from fastapi import APIRouter, HTTPException, Request
 from observability.middleware.logging_middleware import log_spam_event
-import boto3
 import json
 import base64
 from pydantic import BaseModel
 from app import config 
-from app.services.processor import run_nlp_pipeline
+from app.services.processor_v2 import run_nlp_pipeline, fetch_processed_data
 router = APIRouter()
 
 class ScrapeRequest(BaseModel):
@@ -36,63 +35,40 @@ def root():
         "region": config.REGION
     }
 
-@router.post("/process-articles")
-async def process_articles(request_data: ScrapeRequest, request: Request):
+@router.post("/process-articles/{job_id}")
+async def process_articles(job_id: str, request: Request):
     caller_ip = request.client.host if request.client else "unknown"
     user_id = get_user_id(request)
     
+    auth_header = request.headers.get("Authorization")
+    
     try:
-        result = run_nlp_pipeline(params=request_data.model_dump(), user_id=user_id)
+        result = run_nlp_pipeline(job_id=job_id, user_id=user_id, auth_header=auth_header)
         
+        if result.get("status") == "error":
+            raise Exception(result.get("message"))
+            
         return {
             "status": "success", 
             "message": f"NLP Analysis complete for user: {user_id}",
-            "output_folder": f"users/{user_id}/{config.NLP_BUCKET_NAME}",
+            "job_id": job_id,
             "details": result
         }
     except Exception as e:
-        log_spam_event(caller_ip, "processing failure", "/process-articles")
+        log_spam_event(caller_ip, "processing failure", f"/process-articles/{job_id}")
         raise HTTPException(status_code=500, detail=f"Processing failed: {str(e)}")
 
-@router.get("/processed-articles")
-async def get_processed_articles(request: Request):
+@router.get("/processed-articles/{job_id}")
+async def get_processed_articles(job_id: str, request: Request):
     user_id = get_user_id(request)
     
     try:
-        session = boto3.Session(region_name=config.REGION)
-        s3 = session.client('s3')
+        data = fetch_processed_data(job_id=job_id, user_id=user_id)
         
-        user_prefix = f"users/{user_id}/{config.NEWS_BUCKET_NAME}/"
-        
-        response = s3.list_objects_v2(
-            Bucket=config.S3_BUCKET_NAME, 
-            Prefix=user_prefix
-        )
-        
-        articles = []
-        if 'Contents' in response:
-            for obj in response['Contents']:
-                if obj['Key'] == user_prefix:
-                    continue
-                    
-                file_obj = s3.get_object(Bucket=config.S3_BUCKET_NAME, Key=obj['Key'])
-                text = file_obj['Body'].read().decode('utf-8')
-                
-                articles.append({
-                    "file_key": obj['Key'],
-                    "content": text,
-                    "metadata": {
-                        "publish_date": obj['LastModified'].isoformat(),
-                        "size": obj['Size']
-                    }
-                })
-        
-        return {
-            "status": "success", 
-            "user_id": user_id,
-            "count": len(articles),
-            "articles": articles
-        }
+        if "error" in data:
+            raise Exception(data["error"])
+            
+        return data
     except Exception as e:
         print(f"Error in get_processed_articles for {user_id}: {e}")
         raise HTTPException(status_code=500, detail=f"S3 Retrieval Error: {str(e)}")

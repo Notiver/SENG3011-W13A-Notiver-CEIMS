@@ -1,19 +1,25 @@
+import os
+
 from fastapi import FastAPI
 from mangum import Mangum
 from app.api.routes import router
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 from observability.middleware.rate_limiter import limiter
 from observability.middleware.logging_middleware import observability_middleware
-from aws_lambda_powertools import Metrics
+from aws_lambda_powertools import Metrics, Tracer
+from aws_xray_sdk.core import patch_all
 from fastapi.middleware.cors import CORSMiddleware
 
+patch_all()
+tracer = Tracer(service="data-collection")
 metrics = Metrics(namespace="Notiver", service="data-collection")
-app = FastAPI(root_path="/data-collection")
+app = FastAPI(title="Notiver Collection API")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 app.middleware("http")(observability_middleware)
-# metrics.set_default_dimensions(service="data-collection")
 
 app.add_middleware(
     CORSMiddleware,
@@ -27,5 +33,11 @@ app.add_middleware(
 )
 
 app.include_router(router)
-handler = Mangum(app)
+stage = os.getenv("STAGE", "staging")
+_mangum_handler = Mangum(app, lifespan="off", api_gateway_base_path=f"/{stage}/data-collection")
 
+@tracer.capture_lambda_handler
+def handler(event, context):
+    stage = os.getenv("STAGE", "staging")
+    _mangum_handler = Mangum(app, lifespan="off", api_gateway_base_path=f"/{stage}/data-collection")
+    return _mangum_handler(event, context)

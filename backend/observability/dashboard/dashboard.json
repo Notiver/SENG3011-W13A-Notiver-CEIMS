@@ -18,12 +18,12 @@
         {
             "type": "metric",
             "properties": {
-                "title": "Error Count",
+                "title": "Lambda Error Count",
                 "region": "ap-southeast-2",
                 "metrics": [
-                    ["Notiver", "Errors", "service", "data-collection"],
-                    ["Notiver", "Errors", "service", "data-retrieval"],
-                    ["Notiver", "Errors", "service", "data-processing"]
+                    ["AWS/Lambda", "Errors", "FunctionName", "data-collection-function"],
+                    ["AWS/Lambda", "Errors", "FunctionName", "data-retrieval-function"],
+                    ["AWS/Lambda", "Errors", "FunctionName", "data-nlp-analytics"]
                 ],
                 "period": 300,
                 "stat": "Sum",
@@ -36,12 +36,16 @@
                 "title": "Response Time",
                 "region": "ap-southeast-2",
                 "metrics": [
-                    ["Notiver", "Latency", "service", "data-collection"],
-                    ["Notiver", "Latency", "service", "data-retrieval"],
-                    ["Notiver", "Latency", "service", "data-processing"]
+                    ["Notiver", "Latency", "service", "data-collection", { "stat": "Average"}],
+                    ["Notiver", "Latency", "service", "data-collection", { "stat": "p95"}],
+
+                    ["Notiver", "Latency", "service", "data-retrieval", { "stat": "Average"}],
+                    ["Notiver", "Latency", "service", "data-retrieval", { "stat": "p95"}],
+
+                    ["Notiver", "Latency", "service", "data-processing", { "stat": "Average"}],
+                    ["Notiver", "Latency", "service", "data-processing", { "stat": "p95"}]
                 ],
                 "period": 300,
-                "stat": "Average",
                 "view": "timeSeries"
             }
         },
@@ -57,6 +61,36 @@
                 ],
                 "period": 300,
                 "stat": "Average",
+                "view": "timeSeries"
+            }
+        },
+        {
+            "type": "metric",
+            "properties": {
+                "title": "Invocations",
+                "region": "ap-southeast-2",
+                "metrics": [
+                    ["AWS/Lambda", "Invocations", "FunctionName", "data-collection-function"],
+                    ["AWS/Lambda", "Invocations", "FunctionName", "data-retrieval-function"],
+                    ["AWS/Lambda", "Invocations", "FunctionName", "data-nlp-analytics"]
+                ],
+                "period": 300,
+                "stat": "Sum",
+                "view": "timeSeries"
+            }
+        },
+        {
+            "type": "metric",
+            "properties": {
+                "title": "Throttles",
+                "region": "ap-southeast-2",
+                "metrics": [
+                    ["AWS/Lambda", "Throttles", "FunctionName", "data-collection-function"],
+                    ["AWS/Lambda", "Throttles", "FunctionName", "data-retrieval-function"],
+                    ["AWS/Lambda", "Throttles", "FunctionName", "data-nlp-analytics"]
+                ],
+                "period": 300,
+                "stat": "Sum",
                 "view": "timeSeries"
             }
         },
@@ -95,7 +129,7 @@
                 "title": "Storage Events",
                 "region": "ap-southeast-2",
                 "metrics": [
-                    ["Notiver", "SpamEvents", "service", "data-collection"]
+                    ["Notiver", "StorageEvents", "service", "data-collection"]
                 ],
                 "period": 300,
                 "stat": "Sum",
@@ -144,6 +178,24 @@
                 "region": "ap-southeast-2",
                 "title": "Spam Events",
                 "query": "SOURCE '/aws/lambda/data-collection-function' | SOURCE '/aws/lambda/data-nlp-analytics' | fields @timestamp, caller_ip, endpoint, reason\n| filter event_type = \"spam\"\n| sort @timestamp desc\n| limit 20",
+                "view": "table"
+            }
+        },
+        {
+            "type": "log",
+            "properties": {
+                "region": "ap-southeast-2",
+                "title": "Recent Execution Traces",
+                "query": "SOURCE '/aws/lambda/data-collection-function' | SOURCE '/aws/lambda/data-retrieval-function' | SOURCE '/aws/lambda/data-nlp-analytics' | fields @timestamp, service, endpoint, xray_trace_id, duration_ms, @message\n| filter ispresent(xray_trace_id)\n| sort @timestamp desc\n| limit 20",
+                "view": "table"
+            }
+        },
+        {
+            "type": "log",
+            "properties": {
+                "region": "ap-southeast-2",
+                "title": "Slowest Traces by Service",
+                "query": "SOURCE '/aws/lambda/data-collection-function' | SOURCE '/aws/lambda/data-retrieval-function' | SOURCE '/aws/lambda/data-nlp-analytics' | fields service, endpoint, duration_ms, xray_trace_id, @message\n| filter ispresent(xray_trace_id) and ispresent(duration_ms)\n| stats max(duration_ms) as max_ms by xray_trace_id, service, endpoint | sort max_ms desc\n| limit 15",
                 "view": "table"
             }
         }
