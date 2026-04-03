@@ -206,7 +206,6 @@ jobs:
       - name: Inject AWS Account ID into OpenAPI spec
         run: |
           sed -i "s/\${AWS_ACCOUNT_ID}/${{ secrets.AWS_ACCOUNT_ID }}/g" backend/infrastructure/openapi.yaml
-          -i "s/TARGET_STAGE_PLACEHOLDER/$TARGET_STAGE/g" backend/infrastructure/openap sedi.yaml
 
       - name: Deploy API Gateway
         run: |
