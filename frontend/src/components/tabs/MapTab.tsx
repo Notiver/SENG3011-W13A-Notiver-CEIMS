@@ -25,25 +25,33 @@ export default function MapTab() {
         if (!geoResponse.ok) throw new Error("Local GeoJSON file not found");
         const geoData = await geoResponse.json();
 
-        let liveStatsMap: Record<string, any> = {};
+        let liveStatsMap: Record<string, { score: number; total_crimes: number }> = {};
 
         try {
-          const { lgas } = await api.getAllLgas();
-          const statsPromises = lgas.map((lga: string) => 
-            api.getLgaStats(lga).catch(() => null)
-          ); 
-          const results = await Promise.all(statsPromises);
+          // Fetch the unified Community Intelligence Pool!
+          const publicData = await api.getPublicCeimsMap();
+          
+          if (publicData.articles && publicData.articles.length > 0) {
+            const lgaGroups: Record<string, { totalScore: number; count: number }> = {};
+            
+            publicData.articles.forEach((article: any) => {
+              if (article.lga) {
+                const cleanLga = article.lga.toUpperCase();
+                if (!lgaGroups[cleanLga]) lgaGroups[cleanLga] = { totalScore: 0, count: 0 };
+                
+                lgaGroups[cleanLga].totalScore += article.sentiment_score;
+                lgaGroups[cleanLga].count += 1;
+              }
+            });
 
-          results.forEach((res: any) => {
-            if (res && res.overall) {
-              const cleanLgaName = res.overall.lga.toUpperCase(); 
-              
-              liveStatsMap[cleanLgaName] = {
-                score: Math.round(res.overall.sentiment_score * 100),
-                total_crimes: res.overall.total_crimes
+            Object.keys(lgaGroups).forEach((lga) => {
+              const avgSentiment = lgaGroups[lga].totalScore / lgaGroups[lga].count;
+              liveStatsMap[lga] = {
+                score: Math.round(avgSentiment * 100),
+                total_crimes: lgaGroups[lga].count
               };
-            }
-          });
+            });
+          }
         } catch (apiError) {
           console.warn("Could not fetch live API data. Rendering base map.", apiError);
         }
@@ -51,7 +59,6 @@ export default function MapTab() {
         const enrichedGeoJson = {
           ...geoData,
           features: geoData.features.map((feature: any) => {
-            
             const lgaName = feature.properties.NSW_LGA__3?.toUpperCase(); 
             const liveData = liveStatsMap[lgaName] || { score: 0, total_crimes: 0 };
             

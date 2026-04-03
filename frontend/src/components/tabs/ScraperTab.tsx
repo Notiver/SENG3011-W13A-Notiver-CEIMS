@@ -192,7 +192,8 @@ export default function ScraperTab() {
     setProcessStep(1);
 
     try {
-      await api.processArticles(currentJobId);
+      const isCeimsMode = locationMode === "ceims";
+      await api.processArticles(currentJobId, isCeimsMode);
       setProcessStep(2);
 
       const finalData = await api.getProcessedArticles(currentJobId);
