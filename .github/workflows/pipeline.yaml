@@ -28,7 +28,7 @@ jobs:
             pytest==7.4.4 \
             pytest-cov==4.1.0 \
             pytest-html==3.2.0 \
-            weasyprint ruff boto3 moto
+            pytest-html-cov weasyprint ruff boto3 moto
 
       - name: Run linting
         run: ruff check .
@@ -39,7 +39,7 @@ jobs:
           export PYTHONPATH=$PYTHONPATH:$(pwd)/../../
           echo "@page { size: A4 landscape; margin: 1cm; }" > landscape.css
           pip install -r requirements.txt
-          python -m pytest --cov=app --cov-report=term-missing --html=report.html --self-contained-html --css=landscape.css
+          python -m pytest --cov=app --html=report.html --self-contained-html --css=landscape.css
           python -m weasyprint report.html data-retrieval-report.pdf
 
       - name: Test Data Collection
@@ -50,7 +50,7 @@ jobs:
           echo "@page { size: A4 landscape; margin: 1cm; }" > landscape.css
           if [ -f "requirements.txt" ]; then pip install -r requirements.txt; fi
           if [ -d "tests" ]; then
-            python -m pytest --cov=app --cov-report=term-missing --html=report.html --self-contained-html --css=landscape.css
+            python -m pytest --cov=app --html=report.html --self-contained-html --css=landscape.css
             python -m weasyprint report.html data-collection-report.pdf
           fi
 
@@ -61,7 +61,7 @@ jobs:
           echo "@page { size: A4 landscape; margin: 1cm; }" > landscape.css
           if [ -f "requirements.txt" ]; then pip install -r requirements.txt; fi
           if [ -d "tests" ]; then
-            python -m pytest --cov=app --cov-report=term-missing --html=report.html --self-contained-html --css=landscape.css
+            python -m pytest --cov=app --html=report.html --self-contained-html --css=landscape.css
             python -m weasyprint report.html data-processing-report.pdf
           fi
 
