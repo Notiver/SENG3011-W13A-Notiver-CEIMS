@@ -28,7 +28,7 @@ def test_ac_2():
     print("success")
 
 def test_ac_3():
-    """AC3: Comparing over time"""
+    """AC3: Comparing over time - can perform this call multiple times"""
     print("Police AC3...", end="")
     response = httpx.get(
         f"{API_URL}/{RETRIEVAL_ROUTE}/lga/{LGA}/yearly",

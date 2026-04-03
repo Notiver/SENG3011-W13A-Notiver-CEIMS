@@ -17,10 +17,10 @@ def test_ac_1():
     print("success")
 
 def test_ac_2():
-    """AC2: Comparing between different LGAs"""
-    print("Business Owner AC2...", end="")
+    """AC2: Getting types of crime for a year"""
+    print("Business Owner AC3...", end="")
     response = httpx.get(
-        f"{API_URL}/{RETRIEVAL_ROUTE}/lgas",
+        f"{API_URL}/{RETRIEVAL_ROUTE}/lga/{LGA}/yearly",
         headers={"Authorization": f"Bearer {STAGING_JWT}"},
         timeout=TIMEOUT
     )
@@ -28,10 +28,10 @@ def test_ac_2():
     print("success")
 
 def test_ac_3():
-    """AC3: Comparing over time"""
-    print("Business Owner AC3...", end="")
+    """AC3: Comparing between different LGAs"""
+    print("Business Owner AC2...", end="")
     response = httpx.get(
-        f"{API_URL}/{RETRIEVAL_ROUTE}/lga/{LGA}/yearly",
+        f"{API_URL}/{RETRIEVAL_ROUTE}/lgas",
         headers={"Authorization": f"Bearer {STAGING_JWT}"},
         timeout=TIMEOUT
     )
