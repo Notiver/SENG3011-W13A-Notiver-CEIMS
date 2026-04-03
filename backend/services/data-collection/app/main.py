@@ -10,7 +10,7 @@ from observability.middleware.rate_limiter import limiter
 from observability.middleware.logging_middleware import observability_middleware
 from aws_lambda_powertools import Metrics, Tracer
 from aws_xray_sdk.core import patch_all
-from fastapi.middleware.cors import CORSMiddleware
+# from fastapi.middleware.cors import CORSMiddleware
 
 patch_all()
 tracer = Tracer(service="data-collection")
