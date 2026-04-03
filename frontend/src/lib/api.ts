@@ -56,11 +56,11 @@ export const api = {
     fetchAPI(`/data-collection/collect-articles/${jobId}`, { method: "GET" }),
 
   // --- DATA PROCESSING (NLP) ---
-  processArticles: () => 
-    fetchAPI("/data-processing/process-articles", { method: "POST" }),
+  processArticles: (jobId: string, isCeims: boolean) => 
+    fetchAPI(`/data-processing/process-articles/${jobId}?is_ceims=${isCeims}`, { method: "POST" }),
     
-  getProcessedArticles: () => 
-    fetchAPI("/data-processing/processed-articles", { method: "GET" }),
+  getProcessedArticles: (jobId: string) => 
+    fetchAPI(`/data-processing/processed-articles/${jobId}`, { method: "GET" }),
 
   // --- DATA RETRIEVAL ---
   runRetrieval: () => 
@@ -74,4 +74,6 @@ export const api = {
 
   getLgaYearlyStats: (lga: string) => 
     fetchAPI(`/data-retrieval/lga/${encodeURIComponent(lga)}/yearly`, { method: "GET" }),
+
+  getPublicCeimsMap: () => fetchAPI('/data-retrieval/public/ceims-articles', { method: "GET" }),
 };
