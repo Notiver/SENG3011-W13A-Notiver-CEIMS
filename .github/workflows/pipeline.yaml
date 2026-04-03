@@ -37,7 +37,7 @@ jobs:
         working-directory: ./backend/services/data-retrieval
         run: |
           export PYTHONPATH=$PYTHONPATH:$(pwd)/../../
-          echo "@page { size: A4 landscape; margin: 1cm; }" > landscape.css
+          echo "@page { size: A4 landscape; margin: 1cm; } .break-page { break-before: page; }" > landscape.css
           pip install -r requirements.txt
           python -m pytest --cov=app --cov-report=html --html=report.html --self-contained-html --css=landscape.css
           if [ -f "htmlcov/index.html" ]; then
@@ -51,7 +51,7 @@ jobs:
         run: |
           # Only install/test if the files exist, preventing crashes
           export PYTHONPATH=$PYTHONPATH:$(pwd)/../../
-          echo "@page { size: A4 landscape; margin: 1cm; }" > landscape.css
+          echo "@page { size: A4 landscape; margin: 1cm; } .break-page { break-before: page; }" > landscape.css
           if [ -f "requirements.txt" ]; then pip install -r requirements.txt; fi
           if [ -d "tests" ]; then
             python -m pytest --cov=app --cov-report=html --html=report.html --self-contained-html --css=landscape.css
@@ -66,7 +66,7 @@ jobs:
         working-directory: ./backend/services/data-processing
         run: |
           export PYTHONPATH=$PYTHONPATH:$(pwd)/../../
-          echo "@page { size: A4 landscape; margin: 1cm; }" > landscape.css
+          echo "@page { size: A4 landscape; margin: 1cm; } .break-page { break-before: page; }" > landscape.css
           if [ -f "requirements.txt" ]; then pip install -r requirements.txt; fi
           if [ -d "tests" ]; then
             python -m pytest --cov=app --cov-report=html --html=report.html --self-contained-html --css=landscape.css
