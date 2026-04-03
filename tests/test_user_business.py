@@ -1,7 +1,7 @@
 import httpx
 from util_auth import STAGING_JWT
 
-from util_config import API_URL, TIMEOUT, RETRIEVAL_ROUTE, TIMEOUT
+from util_config import API_URL, RETRIEVAL_ROUTE, TIMEOUT
 
 LGA = "RANDWICK CITY COUNCIL"
 
