@@ -41,7 +41,7 @@ def test_get_random_monthly_articles_happy_path(mock_get, mock_sleep):
         with open(temp_filename, "r") as f:
             lines = f.readlines()
             
-        assert len(lines) == 121
+        assert len(lines) == 12 
         assert "https://fake-guardian.com/article1" in lines[0]
     finally:
         os.remove(temp_filename)
