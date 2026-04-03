@@ -44,7 +44,6 @@ def run_nlp_pipeline(job_id: str, user_id: str = "guest_user", auth_header: str 
     except Exception as e:
         return {"status": "error", "message": f"Failed to fetch from collection API: {e}"}
         
-    # Now this will work perfectly without throwing the 'str' error!
     if payload.get("status") != "complete":
       articles = payload.get("articles", [])
     if not articles:
