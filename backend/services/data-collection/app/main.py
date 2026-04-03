@@ -1,8 +1,7 @@
-import os
-
+#import os
 from fastapi import FastAPI
-from mangum import Mangum
 from app.api.routes import router
+from mangum import Mangum
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
