@@ -1,4 +1,3 @@
-import boto3
 import app.config as config
 import requests
 
@@ -6,6 +5,7 @@ from collections import defaultdict
 from utils.lga_format_dict import LGA_FORMAT_MAP
 from utils.crime_dict import CRIME_CATEGORY_MAP, CRIME_WEIGHTS
 from utils.LGAData import get_lga_population
+from utils.db_manager import get_dynamodb_resource
 from decimal import Decimal
 from aws_lambda_powertools import Tracer
 
@@ -14,21 +14,13 @@ tracer = Tracer(service="data-retrieval")
 class PipelineError(Exception):
     pass
 
-def get_dynamodb_resource():
-    """Function to initialize the resource."""
-    try:
-        session = boto3.Session(profile_name=config.PROFILE_NAME)
-        return session.resource('dynamodb', region_name=config.REGION)
-    except Exception:
-        return boto3.resource('dynamodb', region_name=config.REGION)
-
 @tracer.capture_method
-def process_retrieval(dynamodb_resource=None):
+def process_retrieval(dynamodb_resource=None, stage="staging"):
     if not dynamodb_resource:
         dynamodb_resource = get_dynamodb_resource()
     
-    lga_overall_table = dynamodb_resource.Table('lga-overall')
-    lga_by_year_table = dynamodb_resource.Table('lga-by-year')
+    lga_overall_table = dynamodb_resource.Table(f'lga-overall-{stage}')
+    lga_by_year_table = dynamodb_resource.Table(f'lga-by-year-{stage}')
 
     # 1. Fetch data 
     all_article_events, article_events_by_year = process_articles()
@@ -282,7 +274,3 @@ def stat_score(lga_stats):
 
 
     return stat_scores
-
-
-if __name__ == "__main__":
-    process_retrieval()

@@ -17,6 +17,7 @@ def test_full_pipeline_flow(mock_pop, mock_get):
     
     # 0. Setup mock population to prevent division by zero errors
     mock_pop.return_value = 100000
+    stage = "staging"
 
     # 1. Mock the API responses
     # First call: process_articles()
@@ -50,16 +51,18 @@ def test_full_pipeline_flow(mock_pop, mock_get):
 
     # 2. Setup: Create the fake DynamoDB tables in Moto
     dynamodb = boto3.resource("dynamodb", region_name="us-east-1")
+    lga_overall_table = f'lga-overall-{stage}'
+    lga_by_year_table = f'lga-by-year-{stage}'
     
     dynamodb.create_table(
-        TableName='lga-overall',
+        TableName=lga_overall_table,
         KeySchema=[{'AttributeName': 'lga', 'KeyType': 'HASH'}],
         AttributeDefinitions=[{'AttributeName': 'lga', 'AttributeType': 'S'}],
         ProvisionedThroughput={'ReadCapacityUnits': 1, 'WriteCapacityUnits': 1}
     )
     
     dynamodb.create_table(
-        TableName='lga-by-year',
+        TableName=lga_by_year_table,
         KeySchema=[
             {'AttributeName': 'lga', 'KeyType': 'HASH'},
             {'AttributeName': 'year', 'KeyType': 'RANGE'}
@@ -73,14 +76,14 @@ def test_full_pipeline_flow(mock_pop, mock_get):
 
     # 3. Execution: Run the refactored logic with the injected fake DB
     try:
-        process_retrieval(dynamodb_resource=dynamodb)
+        process_retrieval(dynamodb_resource=dynamodb, stage=stage)
     except PipelineError as e:
         pytest.fail(f"Pipeline crashed with a handled error: {e}")
     except Exception as e:
         pytest.fail(f"Pipeline crashed with an unexpected error: {e}")
 
     # 4. Verification: Check the lga-overall table
-    overall_table = dynamodb.Table('lga-overall')
+    overall_table = dynamodb.Table(lga_overall_table)
     overall_response = overall_table.get_item(Key={"lga": "Sydney"})
     
     assert "Item" in overall_response, "Sydney should be in lga-overall"
@@ -88,7 +91,7 @@ def test_full_pipeline_flow(mock_pop, mock_get):
     assert overall_response["Item"]["total_crimes"] == 5
 
     # Verification: Check the lga-by-year table
-    by_year_table = dynamodb.Table('lga-by-year')
+    by_year_table = dynamodb.Table(lga_by_year_table)
     by_year_response = by_year_table.get_item(Key={"lga": "Sydney", "year": "2024"})
     
     assert "Item" in by_year_response, "Sydney 2024 should be in lga-by-year"
