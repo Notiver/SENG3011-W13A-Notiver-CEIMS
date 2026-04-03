@@ -195,22 +195,28 @@ jobs:
       - name: Grant API Gateway permission to invoke Aliases
         run: |
           aws lambda add-permission \
-            --function-name data-collection-function:$TARGET_STAGE \
-            --statement-id AllowAPIGatewayInvoke-$TARGET_STAGE \
+            --function-name data-collection-function \
+            --statement-id AllowAPIGatewayInvoke-${TARGET_STAGE} \
             --action lambda:InvokeFunction \
-            --principal apigateway.amazonaws.com || true
+            --principal apigateway.amazonaws.com \
+            --source-arn "$API_SOURCE_ARN" \
+            --qualifier $TARGET_STAGE || true
             
           aws lambda add-permission \
-            --function-name data-nlp-analytics:$TARGET_STAGE \
-            --statement-id AllowAPIGatewayInvoke-$TARGET_STAGE \
+            --function-name data-nlp-analytics \
+            --statement-id AllowAPIGatewayInvoke-${TARGET_STAGE} \
             --action lambda:InvokeFunction \
-            --principal apigateway.amazonaws.com || true
+            --principal apigateway.amazonaws.com \
+            --source-arn "$API_SOURCE_ARN" \
+            --qualifier $TARGET_STAGE || true
             
           aws lambda add-permission \
-            --function-name data-retrieval-function:$TARGET_STAGE \
-            --statement-id AllowAPIGatewayInvoke-$TARGET_STAGE \
+            --function-name data-retrieval-function \
+            --statement-id AllowAPIGatewayInvoke-${TARGET_STAGE} \
             --action lambda:InvokeFunction \
-            --principal apigateway.amazonaws.com || true
+            --principal apigateway.amazonaws.com \
+            --source-arn "$API_SOURCE_ARN" \
+            --qualifier $TARGET_STAGE || true
 
       - name: Inject AWS Account ID into OpenAPI spec
         run: |
