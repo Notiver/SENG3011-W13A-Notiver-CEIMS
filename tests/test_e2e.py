@@ -4,7 +4,7 @@ from util_auth import STAGING_JWT
 from util_config import API_URL, COLLECTION_ROUTE, PROCESSING_ROUTE, \
     RETRIEVAL_ROUTE, BUCKET, TIMEOUT
 
-from tests.conftest import wait_for_s3_object
+from conftest import wait_for_s3_object
 
 EXCEL_FILE_PATH = "test_data/LGA_trends.xlsx"
 
@@ -23,7 +23,7 @@ def test_e2e_data(s3):
             headers={"Authorization": f"Bearer {STAGING_JWT}"},
             timeout=TIMEOUT
         )
-        assert response.status_code == 200, "failed"
+        assert response.status_code == 200, response.json()
         print("success")
 
     # data collection - check for file upload in S3
@@ -49,7 +49,7 @@ def test_e2e_data(s3):
 
     # data retrieval
     print("Retrieving data...", end="")
-    response = httpx.post(
+    response = httpx.get(
         f"{API_URL}/{RETRIEVAL_ROUTE}/lgas",
     )
     assert response.status_code == 200, "failed"
@@ -65,14 +65,13 @@ def test_e2e_articles(s3):
 
     # data collection - upload articles
     print("Uploading articles to collection endpoint...", end="", flush=True)
-    with open(EXCEL_FILE_PATH, "rb") as f:
-        response = httpx.post(
-            f"{API_URL}/{COLLECTION_ROUTE}/upload-articles",
-            headers={"Authorization": f"Bearer {STAGING_JWT}"},
-            timeout=TIMEOUT
-        )
-        assert response.status_code == 200, "failed"
-        print("success")
+    response = httpx.post(
+        f"{API_URL}/{COLLECTION_ROUTE}/upload-articles",
+        headers={"Authorization": f"Bearer {STAGING_JWT}"},
+        timeout=TIMEOUT
+    )
+    assert response.status_code == 200, "failed"
+    print("success")
 
     # data collection - check articles uploaded in s3
     print("Checking for uploaded file in S3...", end="", flush=True)
@@ -82,16 +81,15 @@ def test_e2e_articles(s3):
 
     # data collection - collect articles
     print("Collecting articles...", end="", flush=True)
-    with open(EXCEL_FILE_PATH, "rb") as f:
-        response = httpx.get(
-            f"{API_URL}/{COLLECTION_ROUTE}/collect-articles",
-            headers={"Authorization": f"Bearer {STAGING_JWT}"},
-            timeout=TIMEOUT
-        )
-        assert response.status_code == 200, "failed"
-        print("success")
-        data = response.json()
-        assert len(data) > 0
+    response = httpx.get(
+        f"{API_URL}/{COLLECTION_ROUTE}/collect-articles",
+        headers={"Authorization": f"Bearer {STAGING_JWT}"},
+        timeout=TIMEOUT
+    )
+    assert response.status_code == 200, "failed"
+    print("success")
+    data = response.json()
+    assert len(data) > 0
 
     # data processing - process articles
     print("Triggering data processing...", end="", flush=True)
@@ -137,7 +135,7 @@ def test_e2e_articles(s3):
     # specific lga
     print("Getting LGA specific data for Bondi...", end="")
     lga = "Waverley Council"
-    response = httpx.post(
+    response = httpx.get(
         f"{API_URL}/{RETRIEVAL_ROUTE}/lga/{lga}",
     )
     assert response.status_code == 200, "failed"
@@ -145,7 +143,7 @@ def test_e2e_articles(s3):
 
     # years
     print("Getting LGA by year info...", end="")
-    response = httpx.post(
+    response = httpx.get(
         f"{API_URL}/{RETRIEVAL_ROUTE}/lga/{lga}/yearly",
     )
     assert response.status_code == 200, "failed"

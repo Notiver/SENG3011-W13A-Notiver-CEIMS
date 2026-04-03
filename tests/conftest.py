@@ -2,10 +2,9 @@
 from time import time
 
 import boto3
-import jwt
 import pytest
 
-from tests.util_config import TIMEOUT
+from util_config import TIMEOUT
 
 @pytest.fixture(scope="module")
 def s3():

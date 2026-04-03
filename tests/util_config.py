@@ -1,6 +1,6 @@
 # config for tests
 
-API_URL = "https://hbjyijsell.execute-api.ap-southeast-2.amazonaws.com/"
+API_URL = "https://hbjyijsell.execute-api.ap-southeast-2.amazonaws.com/staging"
 
 COLLECTION_ROUTE = "data-collection"
 PROCESSING_ROUTE = "data-processing"
