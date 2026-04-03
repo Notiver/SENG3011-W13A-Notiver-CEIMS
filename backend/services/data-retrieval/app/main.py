@@ -36,10 +36,10 @@ app.middleware("http")(observability_middleware)
 
 app.include_router(router)
 stage = os.getenv("STAGE", "staging")
-_mangum_handler = Mangum(app, lifespan="off", api_gateway_base_path=f"/{stage}/data-retrieval")
+_mangum_handler = Mangum(app, lifespan="off", api_gateway_base_path=f"/data-retrieval")
 
 @tracer.capture_lambda_handler
 def handler(event, context):
     stage = os.getenv("STAGE", "staging")
-    _mangum_handler = Mangum(app, lifespan="off", api_gateway_base_path=f"/{stage}/data-retrieval")
+    _mangum_handler = Mangum(app, lifespan="off", api_gateway_base_path=f"/data-retrieval")
     return _mangum_handler(event, context)

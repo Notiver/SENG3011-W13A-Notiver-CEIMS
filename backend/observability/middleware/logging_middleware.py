@@ -13,7 +13,11 @@ async def observability_middleware(request: Request, call_next):
         return await call_next(request)
     start = time.time()
 
-    caller_ip = request.client.host if request.client else "unknown"
+    try:
+        caller_ip = request.client.host if request.client else "unknown"
+    except Exception:
+        caller_ip = "unknown"
+
     endpoint = str(request.url.path)
     method = request.method
 
