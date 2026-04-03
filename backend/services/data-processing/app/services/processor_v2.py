@@ -37,6 +37,10 @@ def run_nlp_pipeline(job_id: str, user_id: str = "guest_user", auth_header: str 
         response = requests.get(target_api_url, headers=headers, timeout=30)
         response.raise_for_status()
         payload = response.json()
+        
+        if isinstance(payload, str):
+            payload = json.loads(payload)
+            
     except Exception as e:
         return {"status": "error", "message": f"Failed to fetch from collection API: {e}"}
         
@@ -44,6 +48,7 @@ def run_nlp_pipeline(job_id: str, user_id: str = "guest_user", auth_header: str 
         return {"status": "error", "message": f"Scrape job is not complete yet. Current status: {payload.get('status')}"}
 
     articles = payload.get("articles", [])
+    
     if not articles:
         return {"status": "success", "message": "No articles found in the scraped data."}
 
