@@ -3,7 +3,6 @@ info:
   title: Notiver CEIMS Unified API
   version: 1.0.0
 
-
 x-amazon-apigateway-cors:
   allowOrigins:
     - "https://main.d2exnodyaugt1a.amplifyapp.com"
@@ -24,7 +23,6 @@ x-amazon-apigateway-cors:
   maxAge: 300
   allowCredentials: true
 
-  
 paths:
   # --- DATA COLLECTION SERVICE ---
   /data-collection/{proxy+}:
@@ -33,7 +31,7 @@ paths:
         payloadFormatVersion: "2.0"
         type: "aws_proxy"
         httpMethod: "POST"
-        uri: "arn:aws:apigateway:ap-southeast-2:lambda:path/2015-03-31/functions/arn:aws:lambda:ap-southeast-2:${AWS_ACCOUNT_ID}:function:data-collection-function:${stageVariables.stage}/invocations"
+        uri: "arn:aws:apigateway:ap-southeast-2:lambda:path/2015-03-31/functions/arn:aws:lambda:ap-southeast-2:${AWS_ACCOUNT_ID}:function:data-collection-function:TARGET_STAGE_PLACEHOLDER/invocations"
 
   # --- DATA PROCESSING SERVICE ---
   /data-processing/{proxy+}:
@@ -42,7 +40,7 @@ paths:
         payloadFormatVersion: "2.0"
         type: "aws_proxy"
         httpMethod: "POST"
-        uri: "arn:aws:apigateway:ap-southeast-2:lambda:path/2015-03-31/functions/arn:aws:lambda:ap-southeast-2:${AWS_ACCOUNT_ID}:function:data-nlp-analytics:${stageVariables.stage}/invocations"
+        uri: "arn:aws:apigateway:ap-southeast-2:lambda:path/2015-03-31/functions/arn:aws:lambda:ap-southeast-2:${AWS_ACCOUNT_ID}:function:data-nlp-analytics:TARGET_STAGE_PLACEHOLDER/invocations"
 
   # --- DATA RETRIEVAL SERVICE ---
   /data-retrieval/{proxy+}:
@@ -51,4 +49,4 @@ paths:
         payloadFormatVersion: "2.0"
         type: "aws_proxy"
         httpMethod: "POST"
-        uri: "arn:aws:apigateway:ap-southeast-2:lambda:path/2015-03-31/functions/arn:aws:lambda:ap-southeast-2:${AWS_ACCOUNT_ID}:function:data-retrieval-function:${stageVariables.stage}/invocations"
+        uri: "arn:aws:apigateway:ap-southeast-2:lambda:path/2015-03-31/functions/arn:aws:lambda:ap-southeast-2:${AWS_ACCOUNT_ID}:function:data-retrieval-function:TARGET_STAGE_PLACEHOLDER/invocations"
