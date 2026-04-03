@@ -34,7 +34,8 @@ jobs:
         run: ruff check .
 
       - name: Create PDF Template
-        run: echo "@page { size: A4 landscape; margin: 1cm; }" > landscape.css
+        run: |
+          echo "@page { size: A4 landscape; margin: 1cm; }" > landscape.css
 
       - name: Test Data Retrieval
         working-directory: ./backend/services/data-retrieval
