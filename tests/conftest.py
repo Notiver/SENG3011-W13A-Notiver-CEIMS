@@ -12,16 +12,18 @@ def s3():
 
 # === helpers ===
 
-def wait_for_s3_object(s3, bucket, key, timeout=TIMEOUT):
-    """Poll S3 until the file appears — async processing needs this."""
-    for _ in range(timeout):
-        print(".", end="", flush=True)
-        try:
-            s3.head_object(Bucket=bucket, Key=key)
-            return True
-        except:
-            time.sleep(1)
-    return False
+def wait_for_s3_object(s3, bucket, key):
+    '''waits for uploads to s3'''
+    waiter = s3.get_waiter('object_exists')
+    try:
+        # Defaults to checking every 5 seconds, 20 times.
+        # You can customize these via Delay and MaxAttempts.
+        waiter.wait(Bucket=bucket, Key=key, \
+                    WaiterConfig={'Delay': 1, 'MaxAttempts': TIMEOUT})
+        return True
+    except Exception as e:
+        print(f"Timed out or error: {e}")
+        return False
 
 # def get_user_id_from_token(token):
 #     # Decode the payload without verifying the signature
