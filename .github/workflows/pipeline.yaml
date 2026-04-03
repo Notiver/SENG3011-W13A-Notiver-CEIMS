@@ -2,9 +2,9 @@ name: SENG3011 Notiver - CI/CD Pipeline
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, staging ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, staging ]
 
 jobs:
   test:
@@ -55,7 +55,7 @@ jobs:
   deploy-to-aws:
     needs: test
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging') && github.event_name == 'push'
     outputs:
       image_tag: ${{ github.sha }}
     steps:
@@ -84,6 +84,9 @@ jobs:
           ECR_REPOSITORY: notiver-data-collection
           IMAGE_TAG: ${{ github.sha }}
         run: |
+          TARGET_STAGE=${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}
+          echo "Detected state: $TARGET_STAGE"
+
           docker build \
             --provenance=false \
             --platform linux/amd64 \
@@ -97,7 +100,13 @@ jobs:
           aws lambda update-function-code \
             --function-name data-collection-function \
             --image-uri $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          cd ../../..
+
+          aws lambda wait function-updated --function-name data-collection-function
+
+          aws lambda update-alias \
+            --function-name data-collection-function \
+            --name $TARGET_STAGE \
+            --function-version \$LATEST
   
       - name: Build, tag, and push data-processing image
         env:
@@ -105,6 +114,9 @@ jobs:
           ECR_REPOSITORY: notiver-nlp-processor
           IMAGE_TAG: ${{ github.sha }}
         run: |
+          TARGET_STAGE=${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}
+          echo "Detected state: $TARGET_STAGE"
+
           docker build \
             --provenance=false \
             --platform linux/amd64 \
@@ -118,7 +130,13 @@ jobs:
           aws lambda update-function-code \
             --function-name data-nlp-analytics \
             --image-uri $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          cd ../../..
+
+          aws lambda wait function-updated --function-name data-nlp-analytics
+
+          aws lambda update-alias \
+            --function-name data-nlp-analytics \
+            --name $TARGET_STAGE \
+            --function-version \$LATEST
 
       - name: Build, tag and push data-retrieval image
         env:
@@ -126,6 +144,9 @@ jobs:
           ECR_REPOSITORY: notiver-data-retrieval
           IMAGE_TAG: ${{ github.sha }}
         run: |
+          TARGET_STAGE=${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}
+          echo "Detected state: $TARGET_STAGE"
+
           docker build \
             --provenance=false \
             --platform linux/amd64 \
@@ -139,13 +160,19 @@ jobs:
           aws lambda update-function-code \
             --function-name data-retrieval-function \
             --image-uri $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          cd ../../..
-     
 
-  push-to-staging:
+          aws lambda wait function-updated --function-name data-retrieval-function
+
+          aws lambda update-alias \
+            --function-name data-retrieval-function \
+            --name $TARGET_STAGE \
+            --function-version \$LATEST
+  
+
+  deploy-to-environment:
     needs: deploy-to-aws
     runs-on: ubuntu-latest
-    environment: staging
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging') && github.event_name == 'push'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -157,29 +184,31 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-southeast-2
 
-      - name: Update Lambda Aliases to Staging environment
+      - name: Set Stage Variable
         run: |
-          aws lambda update-alias --function-name data-collection-function --name staging --function-version \$LATEST
-          aws lambda update-alias --function-name data-nlp-analytics --name staging --function-version \$LATEST
-          aws lambda update-alias --function-name data-retrieval-function --name staging --function-version \$LATEST
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "TARGET_STAGE=production" >> $GITHUB_ENV
+          else
+            echo "TARGET_STAGE=staging" >> $GITHUB_ENV
+          fi
 
-      - name: Grant API Gateway permission to invoke Staging Aliases
+      - name: Grant API Gateway permission to invoke Aliases
         run: |
           aws lambda add-permission \
-            --function-name data-collection-function:staging \
-            --statement-id AllowAPIGatewayInvokeStaging \
+            --function-name data-collection-function:$TARGET_STAGE \
+            --statement-id AllowAPIGatewayInvoke-$TARGET_STAGE \
             --action lambda:InvokeFunction \
             --principal apigateway.amazonaws.com || true
             
           aws lambda add-permission \
-            --function-name data-nlp-analytics:staging \
-            --statement-id AllowAPIGatewayInvokeStaging \
+            --function-name data-nlp-analytics:$TARGET_STAGE \
+            --statement-id AllowAPIGatewayInvoke-$TARGET_STAGE \
             --action lambda:InvokeFunction \
             --principal apigateway.amazonaws.com || true
             
           aws lambda add-permission \
-            --function-name data-retrieval-function:staging \
-            --statement-id AllowAPIGatewayInvokeStaging \
+            --function-name data-retrieval-function:$TARGET_STAGE \
+            --statement-id AllowAPIGatewayInvoke-$TARGET_STAGE \
             --action lambda:InvokeFunction \
             --principal apigateway.amazonaws.com || true
 
@@ -197,54 +226,22 @@ jobs:
         run: |
           aws apigatewayv2 create-deployment \
             --api-id hbjyijsell \
-            --stage-name staging
+            --stage-name $TARGET_STAGE
 
       
-  push-to-production:
-    needs: push-to-staging
-    runs-on: ubuntu-latest
-    environment: production
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-southeast-2
-
-      - name: Update from Staging to Production environment
-        run: |
-          STAGING_VER=$(aws lambda get-alias --function-name data-retrieval-function --name staging --query 'FunctionVersion' --output text)
-  
-          aws lambda update-alias --function-name data-collection-function --name production --function-version $STAGING_VER
-          aws lambda update-alias --function-name data-nlp-analytics --name production --function-version $STAGING_VER
-          aws lambda update-alias --function-name data-retrieval-function --name production --function-version $STAGING_VER
-
-      - name: Grant API Gateway permission to invoke Production Aliases
-        run: |
-          aws lambda add-permission --function-name data-collection-function:production --statement-id AllowAPIGatewayInvokeProd --action lambda:InvokeFunction --principal apigateway.amazonaws.com || true
-          aws lambda add-permission --function-name data-nlp-analytics:production --statement-id AllowAPIGatewayInvokeProd --action lambda:InvokeFunction --principal apigateway.amazonaws.com || true
-          aws lambda add-permission --function-name data-retrieval-function:production --statement-id AllowAPIGatewayInvokeProd --action lambda:InvokeFunction --principal apigateway.amazonaws.com || true
-
-      - name: Create API Deployment
-        run: |
-          aws apigatewayv2 create-deployment \
-          --api-id hbjyijsell \
-          --stage-name production
-
       - name: Install observability dependencies
+        if: github.ref == 'refs/heads/main'
         run: |
           pip install -r backend/observability/requirements.txt
           
       - name: Create/Update CloudWatch Dashboard
+        if: github.ref == 'refs/heads/main'
         run: |
           aws cloudwatch put-dashboard \
             --dashboard-name Notiver-Dashboard \
             --dashboard-body file://backend/observability/dashboard/dashboard.json
 
       - name: Create CloudWatch Alarms
+        if: github.ref == 'refs/heads/main'
         run: |
           python backend/observability/alerts/alarms.py
