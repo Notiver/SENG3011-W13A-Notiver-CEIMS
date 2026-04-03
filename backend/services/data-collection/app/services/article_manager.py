@@ -5,8 +5,11 @@ from app.database.s3 import fetch_all_articles
 from aws_lambda_powertools import Tracer
 from app import config
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-URL_FILE_PATH = os.path.join(BASE_DIR, "..", "..", "guardian_crime_urls.txt")
+URL_FILE_PATH = "/tmp/guardian_crime_urls.txt"
+
+# # for local testing: 
+# BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# URL_FILE_PATH = os.path.join(BASE_DIR, "..", "..", "guardian_crime_urls.txt")
 tracer = Tracer(service="data-collection")
 
 @tracer.capture_method
