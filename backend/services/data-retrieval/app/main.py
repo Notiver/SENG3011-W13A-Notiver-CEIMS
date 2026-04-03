@@ -1,4 +1,5 @@
-#import os
+import os
+
 from fastapi import FastAPI
 from app.api.routes import router
 from mangum import Mangum
@@ -15,11 +16,9 @@ patch_all()
 tracer = Tracer(service="data-retrieval")
 metrics = Metrics(namespace="Notiver", service="data-retrieval")
 app = FastAPI(title="Notiver Retrieval API")
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # metrics.set_default_dimensions(service="data-retrieval")
-app.add_middleware(SlowAPIMiddleware)
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -33,14 +32,17 @@ app.add_middleware(
     allow_headers=["*"], 
 )
 
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 app.middleware("http")(observability_middleware)
 
 app.include_router(router)
-#stage = os.getenv("STAGE", "staging")
-_mangum_handler = Mangum(app, lifespan="off", api_gateway_base_path="/data-retrieval")
+stage = os.getenv("STAGE", "staging")
+_mangum_handler = Mangum(app, lifespan="off", api_gateway_base_path=f"/{stage}/data-retrieval")
 
 @tracer.capture_lambda_handler
 def handler(event, context):
-    #stage = os.getenv("STAGE", "staging")
-    _mangum_handler = Mangum(app, lifespan="off", api_gateway_base_path="/data-retrieval")
+    stage = os.getenv("STAGE", "staging")
+    _mangum_handler = Mangum(app, lifespan="off", api_gateway_base_path=f"/{stage}/data-retrieval")
     return _mangum_handler(event, context)
