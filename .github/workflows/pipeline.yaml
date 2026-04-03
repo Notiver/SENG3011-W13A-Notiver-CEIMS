@@ -192,23 +192,23 @@ jobs:
             echo "TARGET_STAGE=staging" >> $GITHUB_ENV
           fi
 
-      - name: Grant API Gateway permission to invoke Staging Aliases
+      - name: Grant API Gateway permission to invoke Aliases
         run: |
           aws lambda add-permission \
-            --function-name data-collection-function:staging \
-            --statement-id AllowAPIGatewayInvokeStaging \
+            --function-name data-collection-function:$TARGET_STAGE \
+            --statement-id AllowAPIGatewayInvoke-$TARGET_STAGE \
             --action lambda:InvokeFunction \
             --principal apigateway.amazonaws.com || true
             
           aws lambda add-permission \
-            --function-name data-nlp-analytics:staging \
-            --statement-id AllowAPIGatewayInvokeStaging \
+            --function-name data-nlp-analytics:$TARGET_STAGE \
+            --statement-id AllowAPIGatewayInvoke-$TARGET_STAGE \
             --action lambda:InvokeFunction \
             --principal apigateway.amazonaws.com || true
             
           aws lambda add-permission \
-            --function-name data-retrieval-function:staging \
-            --statement-id AllowAPIGatewayInvokeStaging \
+            --function-name data-retrieval-function:$TARGET_STAGE \
+            --statement-id AllowAPIGatewayInvoke-$TARGET_STAGE \
             --action lambda:InvokeFunction \
             --principal apigateway.amazonaws.com || true
 
@@ -229,41 +229,6 @@ jobs:
             --stage-name $TARGET_STAGE
 
       
-  push-to-production:
-    needs: push-to-staging
-    runs-on: ubuntu-latest
-    environment: production
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-southeast-2
-
-      - name: Update from Staging to Production environment
-        run: |
-          STAGING_VER=$(aws lambda get-alias --function-name data-retrieval-function --name staging --query 'FunctionVersion' --output text)
-  
-          aws lambda update-alias --function-name data-collection-function --name production --function-version $STAGING_VER
-          aws lambda update-alias --function-name data-nlp-analytics --name production --function-version $STAGING_VER
-          aws lambda update-alias --function-name data-retrieval-function --name production --function-version $STAGING_VER
-
-      - name: Grant API Gateway permission to invoke Production Aliases
-        run: |
-          aws lambda add-permission --function-name data-collection-function:production --statement-id AllowAPIGatewayInvokeProd --action lambda:InvokeFunction --principal apigateway.amazonaws.com || true
-          aws lambda add-permission --function-name data-nlp-analytics:production --statement-id AllowAPIGatewayInvokeProd --action lambda:InvokeFunction --principal apigateway.amazonaws.com || true
-          aws lambda add-permission --function-name data-retrieval-function:production --statement-id AllowAPIGatewayInvokeProd --action lambda:InvokeFunction --principal apigateway.amazonaws.com || true
-
-      - name: Create API Deployment
-        run: |
-          aws apigatewayv2 create-deployment \
-          --api-id hbjyijsell \
-          --stage-name production
-
       - name: Install observability dependencies
         if: github.ref == 'refs/heads/main'
         run: |
