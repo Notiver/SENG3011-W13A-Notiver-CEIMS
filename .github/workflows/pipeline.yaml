@@ -19,7 +19,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: python -m pip install pytest pytest-cov pytest-html weasyprint ruff boto3 moto
+        run: python -m pip install pytest pytest-cov ruff boto3 moto
 
       - name: Run linting
         run: ruff check .
@@ -29,8 +29,7 @@ jobs:
         run: |
           export PYTHONPATH=$PYTHONPATH:$(pwd)/../../
           pip install -r requirements.txt
-          python -m pytest --cov=app --cov-report=term-missing --html=report.html --self-contained-html
-          python -m weasyprint report.html data-retrieval-report.pdf
+          python -m pytest --cov=app --cov-report=term-missing
 
       - name: Test Data Collection
         working-directory: ./backend/services/data-collection
@@ -38,30 +37,20 @@ jobs:
           # Only install/test if the files exist, preventing crashes
           export PYTHONPATH=$PYTHONPATH:$(pwd)/../../
           if [ -f "requirements.txt" ]; then pip install -r requirements.txt; fi
-          if [ -d "tests" ]; then
-            python -m pytest --cov=app --cov-report=term-missing --html=report.html --self-contained-html
-            python -m weasyprint report.html data-collection-report.pdf
-          fi
+          if [ -d "tests" ]; then python -m pytest --cov=app --cov-report=term-missing; fi
 
       - name: Test Data Processing
         working-directory: ./backend/services/data-processing
         run: |
           export PYTHONPATH=$PYTHONPATH:$(pwd)/../../
           if [ -f "requirements.txt" ]; then pip install -r requirements.txt; fi
-          if [ -d "tests" ]; then
-            python -m pytest --cov=app --cov-report=term-missing --html=report.html --self-contained-html
-            python -m weasyprint report.html data-processing-report.pdf
-          fi
+          if [ -d "tests" ]; then python -m pytest --cov=app --cov-report=term-missing; fi
 
-      - name: Upload All PDF Reports
+      - name: Upload coverage as HTML
         uses: actions/upload-artifact@v4
         with:
-          name: notiver-test-reports
-          if-no-files-found: ignore
-          path: |
-            backend/services/data-retrieval/data-retrieval-report.pdf
-            backend/services/data-collection/data-collection-report.pdf
-            backend/services/data-processing/data-processing-report.pdf
+          name: coverage-html
+          path: htmlcov/
   
   deploy-to-aws:
     needs: test
@@ -202,6 +191,26 @@ jobs:
           else
             echo "TARGET_STAGE=staging" >> $GITHUB_ENV
           fi
+
+      - name: Grant API Gateway permission to invoke Aliases
+        run: |
+          aws lambda add-permission \
+            --function-name data-collection-function:$TARGET_STAGE \
+            --statement-id AllowAPIGatewayInvoke-$TARGET_STAGE \
+            --action lambda:InvokeFunction \
+            --principal apigateway.amazonaws.com || true
+            
+          aws lambda add-permission \
+            --function-name data-nlp-analytics:$TARGET_STAGE \
+            --statement-id AllowAPIGatewayInvoke-$TARGET_STAGE \
+            --action lambda:InvokeFunction \
+            --principal apigateway.amazonaws.com || true
+            
+          aws lambda add-permission \
+            --function-name data-retrieval-function:$TARGET_STAGE \
+            --statement-id AllowAPIGatewayInvoke-$TARGET_STAGE \
+            --action lambda:InvokeFunction \
+            --principal apigateway.amazonaws.com || true
 
       - name: Inject AWS Account ID into OpenAPI spec
         run: |

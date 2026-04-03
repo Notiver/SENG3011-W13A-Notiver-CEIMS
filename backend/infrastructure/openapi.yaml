@@ -3,6 +3,7 @@ info:
   title: Notiver CEIMS Unified API
   version: 1.0.0
 
+
 x-amazon-apigateway-cors:
   allowOrigins:
     - "https://main.d2exnodyaugt1a.amplifyapp.com"
@@ -23,6 +24,7 @@ x-amazon-apigateway-cors:
   maxAge: 300
   allowCredentials: true
 
+  
 paths:
   # --- DATA COLLECTION SERVICE ---
   /data-collection/{proxy+}:
