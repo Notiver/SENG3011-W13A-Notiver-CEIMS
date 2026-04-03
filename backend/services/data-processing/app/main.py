@@ -16,11 +16,8 @@ patch_all()
 tracer = Tracer(service="data-processing")
 metrics = Metrics(namespace="Notiver", service="data-processing")
 app = FastAPI(title="Notiver NLP Processing API")
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # metrics.set_default_dimensions(service="data-processing")
-app.add_middleware(SlowAPIMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
@@ -34,7 +31,10 @@ app.add_middleware(
     allow_headers=["*"], 
 )
 
-#app.middleware("http")(observability_middleware)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
+app.middleware("http")(observability_middleware)
 
 app.include_router(router)
 stage = os.getenv("STAGE", "staging")

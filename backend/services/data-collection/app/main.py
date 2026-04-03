@@ -19,7 +19,6 @@ app = FastAPI(title="Notiver Collection API")
 
 # metrics.set_default_dimensions(service="data-collection")
 
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
