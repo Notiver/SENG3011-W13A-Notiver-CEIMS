@@ -48,7 +48,7 @@ def run_nlp_pipeline(job_id: str, user_id: str = "guest_user", auth_header: str 
         return {"status": "success", "message": "No articles found in the scraped data."}
 
     # TODO remove line when async is added sprint 3
-    articles = articles[:5]
+    articles = articles[:10]
     processed_data = []
     skipped_count = 0
 
