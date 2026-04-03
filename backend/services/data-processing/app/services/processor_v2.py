@@ -38,8 +38,14 @@ def run_nlp_pipeline(job_id: str, user_id: str = "guest_user", auth_header: str 
         response.raise_for_status()
         payload = response.json()
         
-        if isinstance(payload, str):
+        while isinstance(payload, str):
             payload = json.loads(payload)
+            
+        if isinstance(payload, dict) and "body" in payload:
+            body_content = payload["body"]
+            while isinstance(body_content, str):
+                body_content = json.loads(body_content)
+            payload = body_content
             
     except Exception as e:
         return {"status": "error", "message": f"Failed to fetch from collection API: {e}"}
@@ -49,6 +55,12 @@ def run_nlp_pipeline(job_id: str, user_id: str = "guest_user", auth_header: str 
 
     articles = payload.get("articles", [])
     
+    if isinstance(articles, str):
+        try:
+            articles = json.loads(articles)
+        except Exception:
+            articles = []
+            
     if not articles:
         return {"status": "success", "message": "No articles found in the scraped data."}
 
@@ -56,9 +68,20 @@ def run_nlp_pipeline(job_id: str, user_id: str = "guest_user", auth_header: str 
     skipped_count = 0
 
     for article in articles:
+        if isinstance(article, str):
+            print(f"Skipping invalid article format: {article}")
+            skipped_count += 1
+            continue
+            
         file_key = article.get("file_key")
         text_content = article.get("content", "")
         metadata = article.get("metadata", {})
+        
+        if isinstance(metadata, str):
+            try:
+                metadata = json.loads(metadata)
+            except Exception:
+                metadata = {}
 
         if not text_content:
             skipped_count += 1
