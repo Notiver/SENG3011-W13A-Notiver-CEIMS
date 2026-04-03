@@ -1,5 +1,4 @@
-import os
-
+#import os
 from fastapi import FastAPI
 from app.api.routes import router
 from mangum import Mangum
@@ -18,13 +17,15 @@ metrics = Metrics(namespace="Notiver", service="data-processing")
 app = FastAPI(title="Notiver NLP Processing API")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# metrics.set_default_dimensions(service="data-processing")
 app.add_middleware(SlowAPIMiddleware)
-app.middleware("http")(observability_middleware)
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
       "https://main.d2exnodyaugt1a.amplifyapp.com",
+      "https://staging.d2exnodyaugt1a.amplifyapp.com",
       "http://localhost:3000"
     ],
     allow_credentials=True,
@@ -32,12 +33,14 @@ app.add_middleware(
     allow_headers=["*"], 
 )
 
+app.middleware("http")(observability_middleware)
+
 app.include_router(router)
-stage = os.getenv("STAGE", "staging")
-_mangum_handler = Mangum(app, lifespan="off", api_gateway_base_path=f"/{stage}/data-processing")
+#stage = os.getenv("STAGE", "staging")
+_mangum_handler = Mangum(app, lifespan="off", api_gateway_base_path="/data-processing")
 
 @tracer.capture_lambda_handler
 def handler(event, context):
-    stage = os.getenv("STAGE", "staging")
-    _mangum_handler = Mangum(app, lifespan="off", api_gateway_base_path=f"/{stage}/data-processing")
+    #stage = os.getenv("STAGE", "staging")
+    _mangum_handler = Mangum(app, lifespan="off", api_gateway_base_path="/data-processing")
     return _mangum_handler(event, context)
