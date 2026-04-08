@@ -86,6 +86,12 @@ def run_nlp_pipeline(job_id: str, user_id: str = "guest_user", auth_header: str 
         file_key = article.get("file_key")
         text_content = article.get("content", "")
         metadata = article.get("metadata", {})
+        
+        if isinstance(metadata, str):
+            try:
+                metadata = json.loads(metadata)
+            except Exception:
+                metadata = {}
 
         if isinstance(metadata, str):
             try:
