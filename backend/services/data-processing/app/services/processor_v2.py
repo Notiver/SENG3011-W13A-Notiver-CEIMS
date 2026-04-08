@@ -1,6 +1,8 @@
 import boto3
 import json
 import requests
+import traceback
+import time
 from datetime import datetime
 
 # FIX 1: Removed global transformers import to prevent the 10-second CORS timeout
@@ -12,11 +14,7 @@ from aws_lambda_powertools import Tracer
 
 tracer = Tracer(service="data-processing")
 
-try:
-    session = boto3.Session(profile_name=config.PROFILE_NAME)
-    s3 = session.client('s3', region_name=config.REGION if hasattr(config, 'REGION') else "ap-southeast-2")
-except Exception:
-    s3 = boto3.client('s3', region_name=config.REGION if hasattr(config, 'REGION') else "ap-southeast-2")
+s3 = boto3.client('s3', region_name=getattr(config, 'REGION', "ap-southeast-2"))
 
 @tracer.capture_method
 def run_nlp_pipeline(job_id: str, user_id: str = "guest_user", auth_header: str = None, params: dict = None):
@@ -34,6 +32,7 @@ def run_nlp_pipeline(job_id: str, user_id: str = "guest_user", auth_header: str 
     base_url = config.DATA_COLLECTION_URL.rstrip('/')
     target_api_url = f"{base_url}/{job_id}"
     print(f"Fetching scraped data from API: {target_api_url}")
+    start_time = time.time()
     
     headers = {"Authorization": auth_header} if auth_header else {}
     
@@ -41,16 +40,8 @@ def run_nlp_pipeline(job_id: str, user_id: str = "guest_user", auth_header: str 
         response = requests.get(target_api_url, headers=headers, timeout=30)
         response.raise_for_status()
         payload = response.json()
-        
-        while isinstance(payload, str):
-            payload = json.loads(payload)
-            
-        if isinstance(payload, dict) and "body" in payload:
-            body_content = payload["body"]
-            while isinstance(body_content, str):
-                body_content = json.loads(body_content)
-            payload = body_content
-            
+        fetch_time = round(time.time() - start_time, 2)
+        print(f"Successfully fetched data in {fetch_time} seconds.")
     except Exception as e:
         return {"status": "error", "message": f"Failed to fetch from collection API: {e}"}
         
@@ -76,6 +67,11 @@ def run_nlp_pipeline(job_id: str, user_id: str = "guest_user", auth_header: str 
     # TODO remove line when async is added sprint 3
     articles = articles[:10]
     processed_data = []
+    print(f"Pipeline ready to process {len(articles)} articles.")
+    if articles:
+        print(f"First article data type: {type(articles[0])}")
+        if isinstance(articles[0], dict):
+            print(f"First article keys: {list(articles[0].keys())}")
     skipped_count = 0
 
     for article in articles:
@@ -131,6 +127,7 @@ def run_nlp_pipeline(job_id: str, user_id: str = "guest_user", auth_header: str 
             
         except Exception as e:
             print(f"Error processing {file_key}: {e}")
+            print(traceback.format_exc())
 
     bulk_s3_key = None
     if processed_data:
