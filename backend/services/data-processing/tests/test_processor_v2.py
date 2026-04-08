@@ -7,12 +7,11 @@ from app.services.processor_v2 import run_nlp_pipeline, fetch_processed_data
 @pytest.fixture
 def mock_pipeline():
     """Mocks the heavy Hugging Face RoBERTa model so tests run instantly."""
-    with patch("app.services.processor_v2.pipeline") as mock:
+    with patch("transformers.pipeline") as mock:
         mock_instance = MagicMock()
         mock_instance.return_value = [[{"label": "negative", "score": 0.8500}]]
         mock.return_value = mock_instance
         yield mock
-
 @pytest.fixture
 def mock_s3():
     """Mocks the S3 client so we don't actually hit AWS."""
