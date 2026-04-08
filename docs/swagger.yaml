@@ -17,7 +17,7 @@ tags:
   - name: Data Processing and Retrieval
     description: Processes statistical and article data and fetches from the db
   - name: General
-    # description: Other routes.
+    description: Base endpoints
 paths:
   /:
     get:
@@ -101,8 +101,8 @@ paths:
                 format: binary
               # example: 'download link'
 
-        '404':
-          description: Error finding file (bad request)
+        '400':
+          description: Bad request
           content:
             application/json:
               schema:
@@ -143,40 +143,52 @@ paths:
                 $ref: '#/components/schemas/Error'
 
   /collect-articles:
-    get:
+    post:
       tags:
         - Data Collection
-      summary: Download collected articles
-      operationId: collectArticles
-      description: Returns the collected Guardian articles as a download.
+      summary: Trigger dynamic article scraper
+      operationId: triggerScraper
+      description: Starts an asynchronous web scraping job based on location, timeframe, and category. Returns a job_id used to poll for the completed data.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - location
+                - timeFrame
+                - category
+              properties:
+                location:
+                  type: string
+                  example: "Sydney, Australia"
+                  description: "The target geographic location."
+                timeFrame:
+                  type: string
+                  example: "5_per_month_1_year"
+                  description: "The volume and historical depth of the scrape."
+                category:
+                  type: string
+                  example: "crime"
+                  description: "The target news category."
       responses:
         '200':
-          description: Successfully collected articles for download
+          description: Successfully queued scraping job
           content:
             application/json:
               schema:
                 type: object
-                properties: 
+                properties:
                   status:
                     type: string
-                    example: "success"
-                  count:
-                    type: integer
-                    example: 60
-                  articles:
-                    type: array
-                    items:
-                      type: object 
-                      properties:
-                        file_key:
-                          type: string
-                          example: "file_key"
-                        content:
-                          type: string
-                          example: "article content"
-                        metadata:
-                          type: string
-                          example: "file metadata"
+                    example: "processing"
+                  job_id:
+                    type: string
+                    example: "58fd82aa-a353-40a8-bb93-c4dbe703833b"
+                  message:
+                    type: string
+                    example: "Scrape job queued successfully."
         '400':
           description: Bad Request
           content:
@@ -189,16 +201,68 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-  /process-articles:
+
+  /collect-articles/{job_id}:
+    get:
+      tags:
+        - Data Collection
+      summary: Check Scrape Job Status
+      operationId: checkScrapeStatus
+      description: Polls the S3 bucket to see if the asynchronous background scraping job has completed.
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The unique identifier for the SQS scrape job.
+      responses:
+        '200':
+          description: Job status returned (either processing or complete with articles)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "complete"
+                  job_id:
+                    type: string
+                  count:
+                    type: integer
+                  articles:
+                    type: array
+                    items:
+                      type: object
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /process-articles/{job_id}:
     post:
       tags:
-        - Data Processing (NLP)
-      summary: Trigger NLP processing pipeline
+        - Data Processing
+      summary: Trigger NLP processing pipeline for a job
       operationId: processArticles
-      description: >
-        Triggers the internal NLP processing pipeline. The pipeline retrieves raw
-        article data from S3, applies natural language processing (e.g. sentiment analysis),
-        and stores the processed results for downstream services.
+      description: Triggers the internal NLP processing pipeline for a specific job_id. Fetches data from the Collection API, applies NLP, and saves to user's private S3 folder or public pool.
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The unique identifier of the scraped data to process.
+        - name: is_ceims
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: If true, appends the results to the public Community Intelligence Pool.
       responses:
         '200':
           description: Pipeline executed successfully
@@ -206,41 +270,39 @@ paths:
             application/json:
               schema:
                 type: object
-                oneOf:
-                  - type: object
-                    properties:
-                      status:
-                        type: string
-                        example: "success"
-                      processed:
-                        type: integer
-                        example: 15
-                      skipped:
-                        type: integer
-                        example: 2
-                  - type: object
-                    properties:
-                      status:
-                        type: string
-                        example: "success"
-                      message:
-                        type: string
-                        example: "No articles found in bucket."
+                properties:
+                  status:
+                    type: string
+                    example: "success"
+                  processed:
+                    type: integer
+                    example: 15
+                  skipped:
+                    type: integer
+                    example: 2
+                  job_id:
+                    type: string
         '500':
           description: Pipeline execution failed
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-  /processed-articles:
+
+  /processed-articles/{job_id}:
     get:
       tags:
-        - Data Processing (NLP)
-      summary: Retrieve processed articles
+        - Data Processing
+      summary: Retrieve processed articles for a specific job
       operationId: processedArticles
-      description: >
-        Returns processed article data after NLP has been applied. Data is retrieved
-        from internal storage (e.g. S3 or database) via the fetch_processed_data() function.
+      description: Returns the private processed JSON intelligence report for a specific job_id.
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The unique identifier for the processed job.
       responses:
         '200':
           description: Successfully retrieved processed articles
@@ -256,27 +318,20 @@ paths:
                       example: "9news_article_456"
                     source_type:
                       type: string
-                      example: "news"
                     offence_type:
                       type: string
-                      example: "Theft"
                     sentiment_score:
                       type: number
                       format: float
-                      example: 0.4121
                     when:
                       type: string
                       format: date-time
-                      example: "2022-08-01T09:15:00.000000"
                     suburb:
                       type: string
-                      example: "Redfern"
                     lga:
                       type: string
-                      example: "City Of Sydney"
                     postcode:
                       type: string
-                      example: "2016"
         '404':
           description: Processed data not found
           content:
@@ -290,10 +345,42 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /public/ceims-articles:
+    get:
+      tags:
+        - Data Retrieval
+      summary: Get communal CEIMS intelligence
+      operationId: getPublicCeimsArticles
+      description: Fetches the unified, globally shared CEIMS processed data from the public intelligence pool.
+      responses:
+        '200':
+          description: Successfully retrieved public map data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "success"
+                  count:
+                    type: integer
+                    example: 87
+                  articles:
+                    type: array
+                    items:
+                      type: object
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /run-retrieval:
     post:
       tags:
-        - Data Processing and Retrieval
+        - Data Retrieval
       summary: Retrieves and processes data scores to put in DynamoDB
       operationId: runRetrieval
       description: This endpoint fetches processed article data from the Data Processing (NLP), aggregates suburb data into LGA statistics, calculates sentiment and statistical crime scores before finally storing the aggregated data into DynamoDB tables (lga-overall, lga-by-year). 
@@ -317,7 +404,7 @@ paths:
   /lgas:
     get:
       tags:
-        - Data Processing and Retrieval
+        - Data Retrieval
       summary: Get all LGAs
       operationId: getAllLGAs
       description: Retrieves a list of all Local Government Areas stored in the database.
@@ -343,11 +430,10 @@ paths:
   /lga/{lga}:
     get:
       tags:
-        - Data Processing and Retrieval
+        - Data Retrieval
       summary: Get LGA statistics
       operationId: getLGAStats
-      description: >
-        Retrieves overall statistics for a specified LGA.
+      description: Retrieves overall statistics for a specified LGA.
       parameters:
         - name: lga
           in: path
@@ -396,7 +482,7 @@ paths:
   /lga/{lga}/yearly:
     get:
       tags:
-        - Data Processing and Retrieval
+        - Data Retrieval
       summary: Get yearly statistics for an LGA
       operationId: getLGAYearlyStats
       description: Retrieves year-by-year crime and sentiment statistics for a specified LGA.
