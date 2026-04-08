@@ -12,9 +12,9 @@ info:
 tags:
   - name: Data Collection
     description: Collects statistical data and article data
-  - name: Data Processing (NLP)
+  - name: Data Processing
     description: Processes article data to produce an analysis
-  - name: Data Processing and Retrieval
+  - name: Data Retrieval
     description: Processes statistical and article data and fetches from the db
   - name: General
     description: Base endpoints
