@@ -1,6 +1,8 @@
 import boto3
 import json
 import requests
+import traceback
+import time
 from datetime import datetime
 from transformers import pipeline
 
@@ -26,6 +28,7 @@ def run_nlp_pipeline(job_id: str, user_id: str = "guest_user", auth_header: str 
     base_url = config.DATA_COLLECTION_URL.rstrip('/')
     target_api_url = f"{base_url}/{job_id}"
     print(f"Fetching scraped data from API: {target_api_url}")
+    start_time = time.time()
     
     headers = {"Authorization": auth_header} if auth_header else {}
     
@@ -33,6 +36,8 @@ def run_nlp_pipeline(job_id: str, user_id: str = "guest_user", auth_header: str 
         response = requests.get(target_api_url, headers=headers, timeout=30)
         response.raise_for_status()
         payload = response.json()
+        fetch_time = round(time.time() - start_time, 2)
+        print(f"Successfully fetched data in {fetch_time} seconds.")
     except Exception as e:
         return {"status": "error", "message": f"Failed to fetch from collection API: {e}"}
         
@@ -44,6 +49,11 @@ def run_nlp_pipeline(job_id: str, user_id: str = "guest_user", auth_header: str 
         return {"status": "success", "message": "No articles found in the scraped data."}
 
     processed_data = []
+    print(f"Pipeline ready to process {len(articles)} articles.")
+    if articles:
+        print(f"First article data type: {type(articles[0])}")
+        if isinstance(articles[0], dict):
+            print(f"First article keys: {list(articles[0].keys())}")
     skipped_count = 0
 
     for article in articles:
@@ -83,6 +93,7 @@ def run_nlp_pipeline(job_id: str, user_id: str = "guest_user", auth_header: str 
             
         except Exception as e:
             print(f"Error processing {file_key}: {e}")
+            print(traceback.format_exc())
 
     bulk_s3_key = None
     if processed_data:
