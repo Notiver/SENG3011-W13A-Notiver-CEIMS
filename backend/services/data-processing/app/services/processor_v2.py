@@ -11,11 +11,7 @@ from aws_lambda_powertools import Tracer
 
 tracer = Tracer(service="data-processing")
 
-try:
-    session = boto3.Session(profile_name=config.PROFILE_NAME)
-    s3 = session.client('s3', region_name=config.REGION if hasattr(config, 'REGION') else "ap-southeast-2")
-except Exception:
-    s3 = boto3.client('s3', region_name=config.REGION if hasattr(config, 'REGION') else "ap-southeast-2")
+s3 = boto3.client('s3', region_name=getattr(config, 'REGION', "ap-southeast-2"))
 
 @tracer.capture_method
 def run_nlp_pipeline(job_id: str, user_id: str = "guest_user", auth_header: str = None, params: dict = None):    
