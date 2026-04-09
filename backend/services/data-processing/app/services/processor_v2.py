@@ -67,7 +67,7 @@ def run_nlp_pipeline(job_id: str, user_id: str = "guest_user", auth_header: str 
     # TODO remove line when async is added sprint 3
     articles = articles[:10]
     processed_data = []
-    print(f"Pipeline ready to process {len(articles)} articles.")
+    print(f"Articles ready to process: {len(articles)}")
     if articles:
         print(f"First article data type: {type(articles[0])}")
         if isinstance(articles[0], dict):
