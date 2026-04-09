@@ -48,6 +48,11 @@ def run_nlp_pipeline(job_id: str, user_id: str = "guest_user", auth_header: str 
         return {"status": "success", "message": "No articles found in the scraped data."}
 
     processed_data = []
+    print(f"Articles ready to process: {len(articles)}")
+    if articles:
+        print(f"First article data type: {type(articles[0])}")
+        if isinstance(articles[0], dict):
+            print(f"First article keys: {list(articles[0].keys())}")
     skipped_count = 0
 
     for article in articles:
