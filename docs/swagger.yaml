@@ -540,7 +540,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-
 components:
   schemas:
     Error:
@@ -549,3 +548,8 @@ components:
         error:
           type: string
           description: A human-readable error message.
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
