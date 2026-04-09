@@ -16,21 +16,25 @@ patch_all()
 tracer = Tracer(service="data-retrieval")
 metrics = Metrics(namespace="Notiver", service="data-retrieval")
 app = FastAPI(title="Notiver Retrieval API")
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-app.add_middleware(SlowAPIMiddleware)
-app.middleware("http")(observability_middleware)
+
+# metrics.set_default_dimensions(service="data-retrieval")
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
       "https://main.d2exnodyaugt1a.amplifyapp.com",
+      "https://staging.d2exnodyaugt1a.amplifyapp.com",
       "http://localhost:3000"
     ],
     allow_credentials=True,
     allow_methods=["*"], 
     allow_headers=["*"], 
 )
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
+app.middleware("http")(observability_middleware)
 
 app.include_router(router)
 stage = os.getenv("STAGE", "staging")
