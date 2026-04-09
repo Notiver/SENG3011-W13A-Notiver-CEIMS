@@ -119,6 +119,29 @@ export default function ScraperTab() {
     lgaDropdown();
   }, []);
 
+
+  const pollForProcessingResults = async (jobId: string) => {
+    try {
+      const finalData = await api.getProcessedArticles(jobId);
+      
+      if (finalData && finalData.error) {
+        setTimeout(() => pollForProcessingResults(jobId), 5000);
+      } else {
+        // SQS SUCCESSFUL!!!!
+        setProcessStep(2);
+        setProcessedIntelligence(finalData);
+
+        // Run the final retrieval step
+        await api.runRetrieval();
+        setProcessStep(3);
+        setIsProcessing(false);
+      }
+    } catch (error) {
+      console.error("NLP Polling failed:", error);
+      setIsProcessing(false);
+    }
+  };
+
   const lgaDropdown = async () => {
     try {
       const data = await api.getAllLgas();
@@ -186,25 +209,23 @@ export default function ScraperTab() {
     }
   };
 
-  const handleProcess = async () => {
+const handleProcess = async () => {
     if (!currentJobId) return;
     setIsProcessing(true);
     setProcessStep(1);
 
     try {
       const isCeimsMode = locationMode === "ceims";
-      await api.processArticles(currentJobId, isCeimsMode);
-      setProcessStep(2);
-
-      const finalData = await api.getProcessedArticles(currentJobId);
-      setProcessedIntelligence(finalData);
-
-      await api.runRetrieval();
-      setProcessStep(3);
+            const response = await api.processArticles(currentJobId, isCeimsMode);
+      
+      if (response.status === "processing") {
+        pollForProcessingResults(currentJobId);
+      } else {
+        throw new Error("Failed to queue NLP job.");
+      }
       
     } catch (error) {
       console.error("Pipeline failed:", error);
-    } finally {
       setIsProcessing(false);
     }
   };
@@ -513,9 +534,23 @@ export default function ScraperTab() {
           <h3 className="text-zinc-400 font-bold uppercase text-xs tracking-widest">Pipeline Status</h3>
           <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-6 font-mono text-sm space-y-4 shadow-inner">
             <div className="text-zinc-600">[System] Initialising data collection microservice...</div>
-            {processStep >= 1 && <div className={`flex items-center gap-3 animate-in slide-in-from-left-2 duration-300 ${processStep >= 2 ? "text-zinc-400" : "text-yellow-400 animate-pulse"}`}><span>{processStep >= 2 ? "✅" : "⏳"}</span><span>Parsing BOSCAR DATA...</span></div>}
-            {processStep >= 2 && <div className={`flex items-center gap-3 animate-in slide-in-from-left-2 duration-300 ${processStep >= 3 ? "text-zinc-400" : "text-yellow-400 animate-pulse"}`}><span>{processStep >= 3 ? "✅" : "⏳"}</span><span>Uploading to S3...</span></div>}
-            {processStep >= 3 && <div className="text-emerald-500 font-bold mt-6 pt-4 border-t border-zinc-800/50 animate-in fade-in duration-500">[Success] Intelligence compilation complete. Data is ready for geographic mapping.</div>}
+            {processStep >= 1 && (
+              <div className={`flex items-center gap-3 animate-in slide-in-from-left-2 duration-300 ${processStep >= 2 ? "text-zinc-400" : "text-yellow-400 animate-pulse"}`}>
+                <span>{processStep >= 2 ? "✅" : "⏳"}</span>
+                <span>{processStep >= 2 ? "NLP Analysis Complete" : "Running RoBERTa NLP Model in Cloud (Takes ~80s)..."}</span>
+              </div>
+            )}
+            {processStep >= 2 && (
+              <div className={`flex items-center gap-3 animate-in slide-in-from-left-2 duration-300 ${processStep >= 3 ? "text-zinc-400" : "text-yellow-400 animate-pulse"}`}>
+                <span>{processStep >= 3 ? "✅" : "⏳"}</span>
+                <span>Uploading to S3...</span>
+              </div>
+            )}
+            {processStep >= 3 && (
+              <div className="text-emerald-500 font-bold mt-6 pt-4 border-t border-zinc-800/50 animate-in fade-in duration-500">
+                [Success] Intelligence compilation complete. Data is ready for geographic mapping.
+              </div>
+            )}
           </div>
         </div>
       )}
