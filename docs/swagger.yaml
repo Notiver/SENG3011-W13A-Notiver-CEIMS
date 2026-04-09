@@ -9,6 +9,9 @@ info:
   license:
     name: Apache 2.0
     url: 'http://www.apache.org/licenses/LICENSE-2.0.html'
+servers:
+  - url: https://main.d2exnodyaugt1a.amplifyapp.com
+    description: Production server
 tags:
   - name: Data Collection
     description: Collects statistical data and article data
