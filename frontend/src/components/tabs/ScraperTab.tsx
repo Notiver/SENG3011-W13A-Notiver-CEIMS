@@ -119,6 +119,35 @@ export default function ScraperTab() {
     lgaDropdown();
   }, []);
 
+
+  const pollForProcessingResults = async (jobId: string) => {
+    try {
+      const finalData = await api.getProcessedArticles(jobId);
+      
+      if (!finalData || finalData.error) {
+         setTimeout(() => pollForProcessingResults(jobId), 5000);
+         return;
+      }
+      
+      setProcessStep(2);
+      setProcessedIntelligence(finalData);
+
+      // Run the final retrieval step
+      await api.runRetrieval();
+      setProcessStep(3);
+      setIsProcessing(false);
+      
+    } catch (error: any) {
+      const errorMsg = error.message || String(error);
+      if (errorMsg.includes("not found") || errorMsg.includes("404")) {
+         setTimeout(() => pollForProcessingResults(jobId), 5000);
+      } else {
+         console.error("NLP Processing fatally failed:", error);
+         setIsProcessing(false);
+      }
+    }
+  };
+
   const lgaDropdown = async () => {
     try {
       const data = await api.getAllLgas();
