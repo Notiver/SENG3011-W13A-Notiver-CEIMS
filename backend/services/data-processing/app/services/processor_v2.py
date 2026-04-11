@@ -82,7 +82,7 @@ def run_nlp_pipeline(job_id: str, user_id: str = "guest_user", auth_header: str 
                 continue
             
             sentiment_results = sentiment_task(text_content[:1500])
-            scores = {res['label']: round(res['score'], 4) for res in sentiment_results[0]}
+            scores = {res['label'].lower(): round(res['score'], 4) for res in sentiment_results[0]} 
             negative_sentiment = scores.get('negative', 0)
             base_id = file_key.split('/')[-1].replace('.txt', '') if file_key else "unknown"
             
