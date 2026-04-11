@@ -7,6 +7,7 @@ info:
 x-amazon-apigateway-cors:
   allowOrigins:
     - "https://main.d2exnodyaugt1a.amplifyapp.com"
+    - "https://staging.d2exnodyaugt1a.amplifyapp.com"
     - "http://localhost:3000"
   allowMethods:
     - "GET"
@@ -32,7 +33,7 @@ paths:
         payloadFormatVersion: "2.0"
         type: "aws_proxy"
         httpMethod: "POST"
-        uri: "arn:aws:apigateway:ap-southeast-2:lambda:path/2015-03-31/functions/arn:aws:lambda:ap-southeast-2:${AWS_ACCOUNT_ID}:function:data-collection-function/invocations"
+        uri: "arn:aws:apigateway:ap-southeast-2:lambda:path/2015-03-31/functions/arn:aws:lambda:ap-southeast-2:${AWS_ACCOUNT_ID}:function:data-collection-function:${stageVariables.stage}/invocations"
 
   # --- DATA PROCESSING SERVICE ---
   /data-processing/{proxy+}:
@@ -41,7 +42,7 @@ paths:
         payloadFormatVersion: "2.0"
         type: "aws_proxy"
         httpMethod: "POST"
-        uri: "arn:aws:apigateway:ap-southeast-2:lambda:path/2015-03-31/functions/arn:aws:lambda:ap-southeast-2:${AWS_ACCOUNT_ID}:function:data-nlp-analytics/invocations"
+        uri: "arn:aws:apigateway:ap-southeast-2:lambda:path/2015-03-31/functions/arn:aws:lambda:ap-southeast-2:${AWS_ACCOUNT_ID}:function:data-nlp-analytics:${stageVariables.stage}/invocations"
 
   # --- DATA RETRIEVAL SERVICE ---
   /data-retrieval/{proxy+}:
@@ -50,4 +51,4 @@ paths:
         payloadFormatVersion: "2.0"
         type: "aws_proxy"
         httpMethod: "POST"
-        uri: "arn:aws:apigateway:ap-southeast-2:lambda:path/2015-03-31/functions/arn:aws:lambda:ap-southeast-2:${AWS_ACCOUNT_ID}:function:data-retrieval-function/invocations"
+        uri: "arn:aws:apigateway:ap-southeast-2:lambda:path/2015-03-31/functions/arn:aws:lambda:ap-southeast-2:${AWS_ACCOUNT_ID}:function:data-retrieval-function:${stageVariables.stage}/invocations"

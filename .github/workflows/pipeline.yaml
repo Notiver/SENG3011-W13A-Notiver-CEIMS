@@ -96,11 +96,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
-      # - name: Set up Python
-      #   uses: actions/setup-python@v5
-      #   with:
-      #     python-version: "3.11"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -255,15 +250,18 @@ jobs:
           --stage-name production
 
       - name: Install observability dependencies
+        if: github.ref == 'refs/heads/main'
         run: |
           pip install -r backend/observability/requirements.txt
           
       - name: Create/Update CloudWatch Dashboard
+        if: github.ref == 'refs/heads/main'
         run: |
           aws cloudwatch put-dashboard \
             --dashboard-name Notiver-Dashboard \
             --dashboard-body file://backend/observability/dashboard/dashboard.json
 
       - name: Create CloudWatch Alarms
+        if: github.ref == 'refs/heads/main'
         run: |
           python backend/observability/alerts/alarms.py
