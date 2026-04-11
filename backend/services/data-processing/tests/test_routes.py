@@ -1,6 +1,6 @@
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 from app.main import app
 
 client = TestClient(app)
@@ -21,10 +21,12 @@ class TestProcessRoutes:
         assert "target_bucket" in data
         assert "region" in data
 
-    @patch('app.api.routes.run_nlp_pipeline')
-    def test_process_articles_success(self, mock_pipeline, auth_headers):
-        """Tests successful NLP trigger with auth and a job_id parameter."""
-        mock_pipeline.return_value = {"status": "success", "processed": 5, "skipped": 0}
+    @patch('app.api.routes.boto3.client')
+    def test_process_articles_success(self, mock_boto3, auth_headers):
+        """Tests successful NLP trigger drops an SQS message and returns 'processing'."""
+        # Fake the SQS client so no actual call AWS for tests
+        mock_sqs = MagicMock()
+        mock_boto3.return_value = mock_sqs
         
         response = client.post(
             "/process-articles/mock-job-123", 
@@ -32,18 +34,26 @@ class TestProcessRoutes:
         )
         
         assert response.status_code == 200
+        assert response.json()["status"] == "processing"
         assert "test_jane" in response.json()["message"]
         assert response.json()["job_id"] == "mock-job-123"
+        
+        mock_sqs.send_message.assert_called_once()
 
-    @patch('app.api.routes.run_nlp_pipeline')
-    def test_process_articles_unauthorized(self, mock_pipeline):
+    @patch('app.api.routes.boto3.client')
+    def test_process_articles_unauthorized(self, mock_boto3):
         """Verify it defaults to guest_user when no token is provided."""
-        mock_pipeline.return_value = {"status": "success", "processed": 1}
+        mock_sqs = MagicMock()
+        mock_boto3.return_value = mock_sqs
         
         response = client.post("/process-articles/mock-job-123")
         
         assert response.status_code == 200
+        assert response.json()["status"] == "processing"
         assert "guest_user" in response.json()["message"]
+        
+        # Verify the background worker still queued
+        mock_sqs.send_message.assert_called_once()
 
     @patch('app.api.routes.fetch_processed_data')
     def test_get_processed_articles_success(self, mock_fetch, auth_headers):
