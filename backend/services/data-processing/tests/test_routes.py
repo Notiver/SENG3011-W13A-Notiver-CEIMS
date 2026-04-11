@@ -78,10 +78,11 @@ class TestProcessRoutes:
 
     @patch('app.api.routes.fetch_processed_data')
     def test_get_processed_articles_not_found(self, mock_fetch, auth_headers):
-        """Tests the retrieval route handles an invalid or missing job gracefully."""
+        """Tests the retrieval route handles a still-processing or missing job gracefully."""
+        # Mock the scenario where S3 doesn't have the file yet
         mock_fetch.return_value = {"error": "Processed data not found for this job."}
         
         response = client.get("/processed-articles/invalid-job-404", headers=auth_headers)
         
-        assert response.status_code == 500
-        assert "Processed data not found" in response.json()["detail"]
+        assert response.status_code == 200
+        assert "Processed data not found" in response.json()["error"]
