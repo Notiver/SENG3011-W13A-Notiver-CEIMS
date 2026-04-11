@@ -64,9 +64,6 @@ async def get_processed_articles(job_id: str, request: Request):
     
     try:
         data = fetch_processed_data(job_id=job_id, user_id=user_id)
-        
-        if "error" in data:
-            raise Exception(data["error"])
             
         return data
     except Exception as e:
