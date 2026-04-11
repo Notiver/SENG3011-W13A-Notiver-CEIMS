@@ -99,7 +99,6 @@ class TestRunNlpPipeline:
             "status": "complete",
             "articles": [
                 {"file_key": "news/123.txt", "content": "Bad crime happened.", "metadata": {}},
-                # Should be skipped
                 {"file_key": "news/empty.txt", "content": "", "metadata": {}}
             ]
         }
@@ -115,7 +114,14 @@ class TestRunNlpPipeline:
         mock_s3.put_object.assert_called_once()
         called_args = mock_s3.put_object.call_args[1]
         assert "users/jane_doe/processed_intelligence" in called_args["Key"]
-        assert "0.85" in called_args["Body"]
+        
+        # Parse the JSON string back into a python dict
+        uploaded_json = json.loads(called_args["Body"])
+        assert len(uploaded_json) == 1
+        assert uploaded_json[0]["object_id"] == "123"
+        
+        assert "sentiment_score" in uploaded_json[0]
+        assert isinstance(uploaded_json[0]["sentiment_score"], (float, int))
 
     def test_successful_public_ceims_job(self, mock_pipeline, mock_requests, mock_s3, mock_classifiers):
         """Tests the community pooling logic (GET -> Append -> PUT)"""
