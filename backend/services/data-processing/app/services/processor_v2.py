@@ -43,9 +43,23 @@ def run_nlp_pipeline(job_id: str, user_id: str = "guest_user", auth_header: str 
     if payload.get("status") != "complete":
         return {"status": "error", "message": f"Scrape job is not complete yet. Current status: {payload.get('status')}"}
 
-    articles = payload.get("articles", [])
-    if not articles:
+    raw_articles = payload.get("articles", [])
+    if not raw_articles:
         return {"status": "success", "message": "No articles found in the scraped data."}
+
+    if isinstance(raw_articles, dict):
+        if "articles" in raw_articles:
+            articles = raw_articles["articles"]
+        else:
+            articles = list(raw_articles.values())
+    else:
+        articles = raw_articles
+        
+    articles = [a for a in articles if isinstance(a, dict)]
+    print(f"Articles normalized and ready to process: {len(articles)}")
+    
+    if not articles:
+         return {"status": "success", "message": "No valid article objects found after normalization."}
 
     processed_data = []
     skipped_count = 0
