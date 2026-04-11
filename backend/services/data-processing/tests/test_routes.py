@@ -24,7 +24,7 @@ class TestProcessRoutes:
     @patch('app.api.routes.boto3.client')
     def test_process_articles_success(self, mock_boto3, auth_headers):
         """Tests successful NLP trigger drops an SQS message and returns 'processing'."""
-        # Fake the SQS client so no actual call AWS for tests
+        # Fake the SQS client not calling AWS during tests
         mock_sqs = MagicMock()
         mock_boto3.return_value = mock_sqs
         
@@ -35,10 +35,14 @@ class TestProcessRoutes:
         
         assert response.status_code == 200
         assert response.json()["status"] == "processing"
-        assert "test_jane" in response.json()["message"]
         assert response.json()["job_id"] == "mock-job-123"
         
+        # Verify API successfully reaches SQS to queue the message
         mock_sqs.send_message.assert_called_once()
+        
+        # Intercept the SQS payload to verify the username was correctly extracted and sent
+        sqs_payload = mock_sqs.send_message.call_args.kwargs["MessageBody"]
+        assert "test_jane" in sqs_payload
 
     @patch('app.api.routes.boto3.client')
     def test_process_articles_unauthorized(self, mock_boto3):
@@ -50,10 +54,13 @@ class TestProcessRoutes:
         
         assert response.status_code == 200
         assert response.json()["status"] == "processing"
-        assert "guest_user" in response.json()["message"]
         
-        # Verify the background worker still queued
+        # Verify the background worker was still queued
         mock_sqs.send_message.assert_called_once()
+        
+        # Intercept the payload to ensure it defaulted to guest_user
+        sqs_payload = mock_sqs.send_message.call_args.kwargs["MessageBody"]
+        assert "guest_user" in sqs_payload
 
     @patch('app.api.routes.fetch_processed_data')
     def test_get_processed_articles_success(self, mock_fetch, auth_headers):
