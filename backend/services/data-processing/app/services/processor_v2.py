@@ -1,11 +1,8 @@
 import boto3
 import json
 import requests
-import traceback
-import time
 from datetime import datetime
-
-# FIX 1: Removed global transformers import to prevent the 10-second CORS timeout
+from transformers import pipeline
 
 from app import config
 from utils.crime_classifier import classify_crime
@@ -14,13 +11,14 @@ from aws_lambda_powertools import Tracer
 
 tracer = Tracer(service="data-processing")
 
-s3 = boto3.client('s3', region_name=getattr(config, 'REGION', "ap-southeast-2"))
+try:
+    session = boto3.Session(profile_name=config.PROFILE_NAME)
+    s3 = session.client('s3', region_name=config.REGION if hasattr(config, 'REGION') else "ap-southeast-2")
+except Exception:
+    s3 = boto3.client('s3', region_name=config.REGION if hasattr(config, 'REGION') else "ap-southeast-2")
 
 @tracer.capture_method
-def run_nlp_pipeline(job_id: str, user_id: str = "guest_user", auth_header: str = None, params: dict = None):
-    # Lambda import large, will import when loaded in
-    from transformers import pipeline
-    
+def run_nlp_pipeline(job_id: str, user_id: str = "guest_user", auth_header: str = None, params: dict = None):    
     print("Loading RoBERTa sentiment model...")
     with tracer.provider.in_subsegment("Load_RoBERTa_Model"):        
         sentiment_task = pipeline(
@@ -32,7 +30,6 @@ def run_nlp_pipeline(job_id: str, user_id: str = "guest_user", auth_header: str 
     base_url = config.DATA_COLLECTION_URL.rstrip('/')
     target_api_url = f"{base_url}/{job_id}"
     print(f"Fetching scraped data from API: {target_api_url}")
-    start_time = time.time()
     
     headers = {"Authorization": auth_header} if auth_header else {}
     
@@ -40,60 +37,37 @@ def run_nlp_pipeline(job_id: str, user_id: str = "guest_user", auth_header: str 
         response = requests.get(target_api_url, headers=headers, timeout=30)
         response.raise_for_status()
         payload = response.json()
-        fetch_time = round(time.time() - start_time, 2)
-        print(f"Successfully fetched data in {fetch_time} seconds.")
     except Exception as e:
         return {"status": "error", "message": f"Failed to fetch from collection API: {e}"}
         
     if payload.get("status") != "complete":
         return {"status": "error", "message": f"Scrape job is not complete yet. Current status: {payload.get('status')}"}
 
-    articles = payload.get("articles", [])
-    
-    if isinstance(articles, str):
-        try:
-            articles = json.loads(articles)
-        except Exception:
-            articles = []
-            
-    if isinstance(articles, dict):
-        articles = list(articles.values())
-    elif not isinstance(articles, list):
-        articles = []
-
-    if not articles:
+    raw_articles = payload.get("articles", [])
+    if not raw_articles:
         return {"status": "success", "message": "No articles found in the scraped data."}
 
-    # TODO remove line when async is added sprint 3
-    articles = articles[:10]
+    if isinstance(raw_articles, dict):
+        if "articles" in raw_articles:
+            articles = raw_articles["articles"]
+        else:
+            articles = list(raw_articles.values())
+    else:
+        articles = raw_articles
+        
+    articles = [a for a in articles if isinstance(a, dict)]
+    print(f"Articles normalized and ready to process: {len(articles)}")
+    
+    if not articles:
+         return {"status": "success", "message": "No valid article objects found after normalization."}
+
     processed_data = []
-    print(f"Articles ready to process: {len(articles)}")
-    if articles:
-        print(f"First article data type: {type(articles[0])}")
-        if isinstance(articles[0], dict):
-            print(f"First article keys: {list(articles[0].keys())}")
     skipped_count = 0
 
     for article in articles:
-        if isinstance(article, str):
-            skipped_count += 1
-            continue
-            
         file_key = article.get("file_key")
         text_content = article.get("content", "")
         metadata = article.get("metadata", {})
-        
-        if isinstance(metadata, str):
-            try:
-                metadata = json.loads(metadata)
-            except Exception:
-                metadata = {}
-
-        if isinstance(metadata, str):
-            try:
-                metadata = json.loads(metadata)
-            except Exception:
-                metadata = {}
 
         if not text_content:
             skipped_count += 1
@@ -108,7 +82,7 @@ def run_nlp_pipeline(job_id: str, user_id: str = "guest_user", auth_header: str 
                 continue
             
             sentiment_results = sentiment_task(text_content[:1500])
-            scores = {res['label']: round(res['score'], 4) for res in sentiment_results[0]}
+            scores = {res['label'].lower(): round(res['score'], 4) for res in sentiment_results[0]} 
             negative_sentiment = scores.get('negative', 0)
             base_id = file_key.split('/')[-1].replace('.txt', '') if file_key else "unknown"
             
@@ -127,17 +101,18 @@ def run_nlp_pipeline(job_id: str, user_id: str = "guest_user", auth_header: str 
             
         except Exception as e:
             print(f"Error processing {file_key}: {e}")
-            print(traceback.format_exc())
 
     bulk_s3_key = None
     if processed_data:
         try:
+            # For Communal CEIMS article Archive - Check if this is a CEIMS job from frontend
             is_ceims = params.get("is_ceims", False) if params else False
             
             if is_ceims:
                 ceims_s3_key = "public/ceims/all_processed_articles.json"
                 existing_data = []
                 
+                # Attempt to download the existing public file
                 try:
                     existing_obj = s3.get_object(Bucket=config.S3_BUCKET_NAME, Key=ceims_s3_key)
                     existing_data = json.loads(existing_obj['Body'].read().decode('utf-8'))
