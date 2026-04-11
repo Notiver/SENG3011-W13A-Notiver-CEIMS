@@ -2,9 +2,9 @@ name: SENG3011 Notiver - CI/CD Pipeline
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, staging ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, staging ]
 
 jobs:
   test:
@@ -18,8 +18,17 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Install System Dependencies for PDF
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpango-1.0-0 libharfbuzz0b libpangoft2-1.0-0
+
       - name: Install dependencies
-        run: python -m pip install pytest pytest-cov ruff boto3 moto
+        run: python -m pip install \
+            pytest==7.4.4 \
+            pytest-cov==4.1.0 \
+            pytest-html==3.2.0 \
+            weasyprint ruff boto3 moto
 
       - name: Run linting
         run: ruff check .
@@ -28,34 +37,60 @@ jobs:
         working-directory: ./backend/services/data-retrieval
         run: |
           export PYTHONPATH=$PYTHONPATH:$(pwd)/../../
+          echo "@page { size: A4 landscape; margin: 1cm; }" > landscape.css
           pip install -r requirements.txt
-          python -m pytest --cov=app --cov-report=term-missing
+          python -m pytest --cov=app --cov-report=html --html=report.html --self-contained-html --css=landscape.css
+          if [ -f "htmlcov/index.html" ]; then
+            echo "<hr><h2>Code Coverage Report</h2>" >> report.html
+            sed -e '/<header>/,/<\/header>/d' -e '/<aside id="help_shell">/,/<\/aside>/d' htmlcov/index.html >> report.html
+          fi
+          python -m weasyprint report.html data-retrieval-report.pdf
 
       - name: Test Data Collection
         working-directory: ./backend/services/data-collection
         run: |
           # Only install/test if the files exist, preventing crashes
           export PYTHONPATH=$PYTHONPATH:$(pwd)/../../
+          echo "@page { size: A4 landscape; margin: 1cm; }" > landscape.css
           if [ -f "requirements.txt" ]; then pip install -r requirements.txt; fi
-          if [ -d "tests" ]; then python -m pytest --cov=app --cov-report=term-missing; fi
+          if [ -d "tests" ]; then
+            python -m pytest --cov=app --cov-report=html --html=report.html --self-contained-html --css=landscape.css
+            if [ -f "htmlcov/index.html" ]; then
+              echo "<hr><h2>Code Coverage Report</h2>" >> report.html
+              sed -e '/<header>/,/<\/header>/d' -e '/<aside id="help_shell">/,/<\/aside>/d' htmlcov/index.html >> report.html
+            fi
+            python -m weasyprint report.html data-collection-report.pdf
+          fi
 
       - name: Test Data Processing
         working-directory: ./backend/services/data-processing
         run: |
           export PYTHONPATH=$PYTHONPATH:$(pwd)/../../
+          echo "@page { size: A4 landscape; margin: 1cm; }" > landscape.css
           if [ -f "requirements.txt" ]; then pip install -r requirements.txt; fi
-          if [ -d "tests" ]; then python -m pytest --cov=app --cov-report=term-missing; fi
+          if [ -d "tests" ]; then
+            python -m pytest --cov=app --cov-report=html --html=report.html --self-contained-html --css=landscape.css
+            if [ -f "htmlcov/index.html" ]; then
+              echo "<hr><h2>Code Coverage Report</h2>" >> report.html
+              sed -e '/<header>/,/<\/header>/d' -e '/<aside id="help_shell">/,/<\/aside>/d' htmlcov/index.html >> report.html
+            fi
+            python -m weasyprint report.html data-processing-report.pdf
+          fi
 
-      - name: Upload coverage as HTML
+      - name: Upload All PDF Reports
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-html
-          path: htmlcov/
+          name: notiver-test-reports
+          if-no-files-found: ignore
+          path: |
+            backend/services/data-retrieval/data-retrieval-report.pdf
+            backend/services/data-collection/data-collection-report.pdf
+            backend/services/data-processing/data-processing-report.pdf
   
   deploy-to-aws:
     needs: test
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging') && github.event_name == 'push'
     outputs:
       image_tag: ${{ github.sha }}
     steps:
@@ -97,7 +132,8 @@ jobs:
           aws lambda update-function-code \
             --function-name data-collection-function \
             --image-uri $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          cd ../../..
+
+          aws lambda wait function-updated --function-name data-collection-function
   
       - name: Build, tag, and push data-processing image
         env:
@@ -118,7 +154,13 @@ jobs:
           aws lambda update-function-code \
             --function-name data-nlp-analytics \
             --image-uri $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          cd ../../..
+
+          aws lambda update-function-code \
+            --function-name data-nlp-worker \
+            --image-uri $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+            
+          aws lambda wait function-updated --function-name data-nlp-analytics
+          aws lambda wait function-updated --function-name data-nlp-worker
 
       - name: Build, tag and push data-retrieval image
         env:
@@ -139,12 +181,13 @@ jobs:
           aws lambda update-function-code \
             --function-name data-retrieval-function \
             --image-uri $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          cd ../../..
-     
+
+          aws lambda wait function-updated --function-name data-retrieval-function
 
   push-to-staging:
     needs: deploy-to-aws
     runs-on: ubuntu-latest
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging') && github.event_name == 'push'
     environment: staging
     steps:
       - name: Checkout code
@@ -161,6 +204,7 @@ jobs:
         run: |
           aws lambda update-alias --function-name data-collection-function --name staging --function-version \$LATEST
           aws lambda update-alias --function-name data-nlp-analytics --name staging --function-version \$LATEST
+          aws lambda update-alias --function-name data-nlp-worker --name staging --function-version \$LATEST
           aws lambda update-alias --function-name data-retrieval-function --name staging --function-version \$LATEST
 
       - name: Inject AWS Account ID into OpenAPI spec
@@ -179,10 +223,10 @@ jobs:
             --api-id hbjyijsell \
             --stage-name staging
 
-      
   push-to-production:
     needs: push-to-staging
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     environment: production
     steps:
       - name: Checkout code
@@ -201,6 +245,7 @@ jobs:
   
           aws lambda update-alias --function-name data-collection-function --name production --function-version $STAGING_VER
           aws lambda update-alias --function-name data-nlp-analytics --name production --function-version $STAGING_VER
+          aws lambda update-alias --function-name data-nlp-worker --name production --function-version $STAGING_VER
           aws lambda update-alias --function-name data-retrieval-function --name production --function-version $STAGING_VER
 
       - name: Create API Deployment
