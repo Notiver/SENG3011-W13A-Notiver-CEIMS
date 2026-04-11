@@ -25,7 +25,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
       "https://main.d2exnodyaugt1a.amplifyapp.com",
-      "http://localhost:3000"
+      "http://localhost:3000",
+      "https://staging.d2exnodyaugt1a.amplifyapp.com",
     ],
     allow_credentials=True,
     allow_methods=["*"], 
