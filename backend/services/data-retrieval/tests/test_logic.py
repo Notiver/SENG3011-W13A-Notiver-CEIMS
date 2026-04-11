@@ -29,11 +29,11 @@ class TestRetrieverMathLogic:
     def test_sentiment_scores(self):
         """Tests that sentiment scores are averaged correctly per LGA."""
         mock_events = [
-            {"lga": "Sydney", "severity_score": 0.8},
-            {"lga": "Sydney", "severity_score": 0.4}, # Average for Sydney = 0.6
-            {"lga": "Parramatta", "severity_score": 0.5},
-            {"lga": "Sydney", "severity_score": None}, # Should be ignored
-            {"lga": "LGA not found", "severity_score": 0.9} # Should be ignored
+            {"lga": "Sydney", "sentiment_score": 0.8},
+            {"lga": "Sydney", "sentiment_score": 0.4}, # Average for Sydney = 0.6
+            {"lga": "Parramatta", "sentiment_score": 0.5},
+            {"lga": "Sydney", "sentiment_score": None}, # Should be ignored
+            {"lga": "LGA not found", "sentiment_score": 0.9} # Should be ignored
         ]
         
         result = sentiment_scores(mock_events)

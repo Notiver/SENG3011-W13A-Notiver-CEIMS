@@ -2,7 +2,6 @@ import boto3
 import json
 import requests
 from datetime import datetime
-from transformers import pipeline
 
 from app import config
 from utils.crime_classifier import classify_crime
@@ -18,7 +17,8 @@ except Exception:
     s3 = boto3.client('s3', region_name=config.REGION if hasattr(config, 'REGION') else "ap-southeast-2")
 
 @tracer.capture_method
-def run_nlp_pipeline(job_id: str, user_id: str = "guest_user", auth_header: str = None, params: dict = None):    
+def run_nlp_pipeline(job_id: str, user_id: str = "guest_user", auth_header: str = None, params: dict = None):  
+    from transformers import pipeline  
     print("Loading RoBERTa sentiment model...")
     with tracer.provider.in_subsegment("Load_RoBERTa_Model"):        
         sentiment_task = pipeline(

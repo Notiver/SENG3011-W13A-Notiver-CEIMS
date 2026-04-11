@@ -37,7 +37,6 @@ def process_retrieval(dynamodb_resource=None, stage="staging"):
     
     # Extract total crimes directly from the aggregated data!
     lga_total_crimes = {lga: stats["total_crimes"] for lga, stats in aggregated_stats.items()}
-    # -----------------------
 
     lga_total_articles = count_total_articles(all_article_events)
 
@@ -61,19 +60,31 @@ def process_articles():
     all_article_events = []
     article_events_by_year = defaultdict(list)
 
-    url = config.API_URL + "/data-processing/processed-articles"
-    response = requests.get(url)
+    try:
+        base_url = config.DATA_PROCESSING_URL.rstrip('/')
+        url = f"{base_url}/public/ceims-articles"
+    except AttributeError:
+        url = f"{config.API_URL.rstrip('/')}/data-processing/public/ceims-articles"
+        
+    response = requests.get(url, timeout=15)
 
     if response.status_code == 200:
         data = response.json()
-        all_article_events.extend(data)
+        
+        if isinstance(data, dict):
+            articles = data.get("articles", [])
+        else:
+            articles = data
+            
+        all_article_events.extend(articles)
     else:
-        # Replaced sys.exit() with an exception
         raise PipelineError(f"Error {response.status_code}: {response.reason}")
 
     for event in all_article_events:
-        year = event.get('when').split('-')[0]
-        article_events_by_year[year].append(event)
+        when = event.get('when')
+        if when:
+            year = when.split('-')[0]
+            article_events_by_year[year].append(event)
 
     return all_article_events, article_events_by_year
 
@@ -82,12 +93,12 @@ def process_statistics():
     all_lga_stats = []
     lga_stats_by_year = defaultdict(list)
 
-    url = config.API_URL + "/data-collection/collect-data"
-    response = requests.get(url)
+    url = config.API_URL.rstrip('/') + "/data-collection/collect-data"
+    response = requests.get(url, timeout=15)
 
     if response.status_code == 200:
         data_link = response.json().get('url')
-        response2 = requests.get(data_link)
+        response2 = requests.get(data_link, timeout=15)
 
         if response2.status_code != 200:
             raise PipelineError(f"Error {response2.status_code}: {response2.reason}")
@@ -214,7 +225,7 @@ def sentiment_scores(events):
 
     for event in events:
 
-        severity = event.get("severity_score")
+        severity = event.get("sentiment_score") 
         lga = event.get("lga")
 
         if severity is None or lga == "LGA not found":
