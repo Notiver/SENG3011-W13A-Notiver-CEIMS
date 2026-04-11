@@ -5,7 +5,7 @@ import boto3
 import base64
 from pydantic import BaseModel
 from app import config 
-from app.services.processor_v2 import run_nlp_pipeline, fetch_processed_data
+from app.services.processor_v2 import fetch_processed_data
 router = APIRouter()
 
 class ScrapeRequest(BaseModel):
