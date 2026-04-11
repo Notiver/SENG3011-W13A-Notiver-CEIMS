@@ -96,11 +96,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
-      # - name: Set up Python
-      #   uses: actions/setup-python@v5
-      #   with:
-      #     python-version: "3.11"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -137,11 +132,6 @@ jobs:
             --image-uri $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
           aws lambda wait function-updated --function-name data-collection-function
-
-          aws lambda update-alias \
-            --function-name data-collection-function \
-            --name $TARGET_STAGE \
-            --function-version \$LATEST
   
       - name: Build, tag, and push data-processing image
         env:
@@ -170,7 +160,8 @@ jobs:
             --function-name data-nlp-worker \
             --image-uri $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
             
-          cd ../../..
+          aws lambda wait function-updated --function-name data-nlp-analytics
+          aws lambda wait function-updated --function-name data-nlp-worker
 
       - name: Build, tag and push data-retrieval image
         env:
@@ -197,6 +188,8 @@ jobs:
 
           aws lambda wait function-updated --function-name data-retrieval-function
 
+          aws lambda wait function-updated --function-name data-retrieval-function
+
           aws lambda update-alias \
             --function-name data-retrieval-function \
             --name $TARGET_STAGE \
@@ -207,6 +200,7 @@ jobs:
     needs: deploy-to-aws
     runs-on: ubuntu-latest
     if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging') && github.event_name == 'push'
+    environment: staging
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -241,10 +235,10 @@ jobs:
             --api-id hbjyijsell \
             --stage-name $TARGET_STAGE
 
-      
   push-to-production:
     needs: push-to-staging
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     environment: production
     steps:
       - name: Checkout code
