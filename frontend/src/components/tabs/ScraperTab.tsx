@@ -120,28 +120,34 @@ export default function ScraperTab() {
   }, []);
 
 
-  const pollForProcessingResults = async (jobId: string) => {
+ const pollForProcessingResults = async (jobId: string) => {
     try {
       const finalData = await api.getProcessedArticles(jobId);
       
-      if (finalData && finalData.error) {
-        setTimeout(() => pollForProcessingResults(jobId), 5000);
-      } else {
-        // SQS SUCCESSFUL!!!!
-        setProcessStep(2);
-        setProcessedIntelligence(finalData);
-
-        // Run the final retrieval step
-        await api.runRetrieval();
-        setProcessStep(3);
-        setIsProcessing(false);
+      // If we made it here without throwing, SQS is SUCCESSFUL!!!!
+      if (!finalData || finalData.error) {
+         setTimeout(() => pollForProcessingResults(jobId), 5000);
+         return;
       }
-    } catch (error) {
-      console.error("NLP Polling failed:", error);
+      
+      setProcessStep(2);
+      setProcessedIntelligence(finalData);
+
+      await api.runRetrieval();
+      setProcessStep(3);
       setIsProcessing(false);
+      
+    } catch (error: any) {
+      const errorMsg = error.message || String(error);
+      if (errorMsg.includes("not found") || errorMsg.includes("404")) {
+         setTimeout(() => pollForProcessingResults(jobId), 5000);
+      } else {
+         console.error("NLP Processing fatally failed:", error);
+         setIsProcessing(false);
+      }
     }
   };
-
+  
   const lgaDropdown = async () => {
     try {
       const data = await api.getAllLgas();
