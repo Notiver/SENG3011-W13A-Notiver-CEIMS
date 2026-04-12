@@ -23,9 +23,12 @@ def test_full_pipeline_flow(mock_pop, mock_get):
     # First call: process_articles()
     mock_articles = MagicMock()
     mock_articles.status_code = 200
-    mock_articles.json.return_value = [
-        {"lga": "Sydney", "severity_score": 0.5, "when": "2024-01-01"}
-    ]
+    mock_articles.json.return_value = {
+        "status": "success",
+        "articles": [
+            {"lga": "Sydney", "sentiment_score": 0.5, "when": "2024-01-01"}
+        ]
+    }
 
     # Second call: process_statistics() -> gets the data link
     mock_stats_link = MagicMock()
@@ -107,14 +110,15 @@ def test_pipeline_error_on_api_failure(mock_get):
     # Mock a 500 Internal Server Error response
     mock_error = MagicMock()
     mock_error.status_code = 500
-    mock_error.reason = "Internal Server Error"
+    mock_error.text = "Mocked 500 Crash"
     
     # We only need one side effect because it will fail on the first call
     mock_get.return_value = mock_error
     
-    # We expect our custom PipelineError to be raised (not sys.exit!)
+    # We expect our custom PipelineError to be raised
     with pytest.raises(PipelineError) as exc_info:
-        process_retrieval() # No need to pass dynamodb here since it fails before saving
+        process_retrieval() 
         
-    assert "Error 500: Internal Server Error" in str(exc_info.value)
+    assert "process_articles crashed!" in str(exc_info.value)
+    assert "Status: 500" in str(exc_info.value)
     print("\n✅ Success! Pipeline gracefully caught the API failure.")

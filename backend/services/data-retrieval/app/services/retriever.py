@@ -60,17 +60,15 @@ def process_articles():
     all_article_events = []
     article_events_by_year = defaultdict(list)
 
-    try:
-        base_url = config.DATA_PROCESSING_URL.rstrip('/')
-        url = f"{base_url}/public/ceims-articles"
-    except AttributeError:
-        url = f"{config.API_URL.rstrip('/')}/data-processing/public/ceims-articles"
+    # --- FIX 1: Safely build the URL to hit the public master file ---
+    url = f"{config.API_URL.rstrip('/')}/data-processing/public/ceims-articles"
         
     response = requests.get(url, timeout=15)
 
     if response.status_code == 200:
         data = response.json()
         
+        # --- FIX 2: Safely extract the list out of the dictionary! ---
         if isinstance(data, dict):
             articles = data.get("articles", [])
         else:
@@ -78,9 +76,10 @@ def process_articles():
             
         all_article_events.extend(articles)
     else:
-        raise PipelineError(f"Error {response.status_code}: {response.reason}")
+        raise PipelineError(f"process_articles crashed! URL: {url} | Status: {response.status_code} | Body: {response.text}")
 
     for event in all_article_events:
+        # Extra safety check so missing dates don't crash the loop
         when = event.get('when')
         if when:
             year = when.split('-')[0]
@@ -101,11 +100,11 @@ def process_statistics():
         response2 = requests.get(data_link, timeout=15)
 
         if response2.status_code != 200:
-            raise PipelineError(f"Error {response2.status_code}: {response2.reason}")
+            raise PipelineError(f"process_statistics (Data Link) crashed! URL: {data_link} | Status: {response2.status_code} | Body: {response2.text}")
 
         data = response2.json()
     else:
-        raise PipelineError(f"Error {response.status_code}: {response.reason}")
+        raise PipelineError(f"process_statistics (API) crashed! URL: {url} | Status: {response.status_code} | Body: {response.text}")
 
     if data.get('data_source') != "BOSCAR Data" or data.get('data_type') != "Dataset":
         return all_lga_stats, lga_stats_by_year
@@ -225,6 +224,7 @@ def sentiment_scores(events):
 
     for event in events:
 
+        # --- FIX 3: Use the exact key the AI model outputs ---
         severity = event.get("sentiment_score") 
         lga = event.get("lga")
 
