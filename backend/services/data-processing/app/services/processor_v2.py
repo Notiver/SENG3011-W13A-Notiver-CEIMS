@@ -2,7 +2,6 @@ import boto3
 import json
 import requests
 from datetime import datetime
-from transformers import pipeline
 
 from app import config
 from utils.crime_classifier import classify_crime
@@ -18,7 +17,8 @@ except Exception:
     s3 = boto3.client('s3', region_name=config.REGION if hasattr(config, 'REGION') else "ap-southeast-2")
 
 @tracer.capture_method
-def run_nlp_pipeline(job_id: str, user_id: str = "guest_user", auth_header: str = None, params: dict = None):    
+def run_nlp_pipeline(job_id: str, user_id: str = "guest_user", auth_header: str = None, params: dict = None):  
+    from transformers import pipeline  
     print("Loading RoBERTa sentiment model...")
     with tracer.provider.in_subsegment("Load_RoBERTa_Model"):        
         sentiment_task = pipeline(
@@ -43,9 +43,23 @@ def run_nlp_pipeline(job_id: str, user_id: str = "guest_user", auth_header: str 
     if payload.get("status") != "complete":
         return {"status": "error", "message": f"Scrape job is not complete yet. Current status: {payload.get('status')}"}
 
-    articles = payload.get("articles", [])
-    if not articles:
+    raw_articles = payload.get("articles", [])
+    if not raw_articles:
         return {"status": "success", "message": "No articles found in the scraped data."}
+
+    if isinstance(raw_articles, dict):
+        if "articles" in raw_articles:
+            articles = raw_articles["articles"]
+        else:
+            articles = list(raw_articles.values())
+    else:
+        articles = raw_articles
+        
+    articles = [a for a in articles if isinstance(a, dict)]
+    print(f"Articles normalized and ready to process: {len(articles)}")
+    
+    if not articles:
+         return {"status": "success", "message": "No valid article objects found after normalization."}
 
     processed_data = []
     skipped_count = 0
@@ -68,7 +82,7 @@ def run_nlp_pipeline(job_id: str, user_id: str = "guest_user", auth_header: str 
                 continue
             
             sentiment_results = sentiment_task(text_content[:1500])
-            scores = {res['label']: round(res['score'], 4) for res in sentiment_results[0]}
+            scores = {res['label'].lower(): round(res['score'], 4) for res in sentiment_results[0]} 
             negative_sentiment = scores.get('negative', 0)
             base_id = file_key.split('/')[-1].replace('.txt', '') if file_key else "unknown"
             
