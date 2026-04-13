@@ -195,7 +195,7 @@
             "properties": {
                 "region": "ap-southeast-2",
                 "title": "Slowest Traces by Service",
-                "query": "SOURCE '/aws/lambda/data-collection-function' | SOURCE '/aws/lambda/data-retrieval-function' | SOURCE '/aws/lambda/data-nlp-analytics' | fields service, endpoint, duration_ms, xray_trace_id, @message\n| filter ispresent(xray_trace_id) and ispresent(duration_ms)\n| stats max(duration_ms) as max_ms, avg(duration_ms) as avg_ms by xray_trace_id, service, endpoint | sort max_ms desc\n| limit 15",
+                "query": "SOURCE '/aws/lambda/data-collection-function' | SOURCE '/aws/lambda/data-retrieval-function' | SOURCE '/aws/lambda/data-nlp-analytics' | fields service, endpoint, duration_ms, xray_trace_id, @message\n| filter ispresent(xray_trace_id) and ispresent(duration_ms)\n| stats max(duration_ms) as max_ms by xray_trace_id, service, endpoint | sort max_ms desc\n| limit 15",
                 "view": "table"
             }
         }

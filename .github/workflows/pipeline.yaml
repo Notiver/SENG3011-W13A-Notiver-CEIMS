@@ -185,6 +185,9 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -207,7 +210,6 @@ jobs:
           --stage-name production
 
       - name: Install observability dependencies
-        working-directory: ./backend/observability
         run: |
           pip install -r backend/observability/requirements.txt
           

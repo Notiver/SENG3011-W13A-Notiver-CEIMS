@@ -1,4 +1,5 @@
 import os
+
 from fastapi import FastAPI
 from app.api.routes import router
 from mangum import Mangum
@@ -19,7 +20,6 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 app.middleware("http")(observability_middleware)
-# metrics.set_default_dimensions(service="data-retrieval")
 
 app.add_middleware(
     CORSMiddleware,
@@ -34,10 +34,10 @@ app.add_middleware(
 
 app.include_router(router)
 stage = os.getenv("STAGE", "staging")
-_mangum_handler = Mangum(app, lifespan="off", api_gateway_base_path=f"/{stage}")
+_mangum_handler = Mangum(app, lifespan="off", api_gateway_base_path=f"/{stage}/data-retrieval")
 
 @tracer.capture_lambda_handler
 def handler(event, context):
     stage = os.getenv("STAGE", "staging")
-    _mangum_handler = Mangum(app, lifespan="off", api_gateway_base_path=f"/{stage}")
+    _mangum_handler = Mangum(app, lifespan="off", api_gateway_base_path=f"/{stage}/data-retrieval")
     return _mangum_handler(event, context)

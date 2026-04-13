@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Request
 from observability.middleware.logging_middleware import log_spam_event
 import json
+import boto3
 import base64
 from pydantic import BaseModel
 from app import config 
@@ -36,14 +37,13 @@ def root():
     }
 
 @router.post("/process-articles/{job_id}")
-async def process_articles(job_id: str, request: Request):
+async def process_articles(job_id: str, request: Request, is_ceims: bool = False):
     caller_ip = request.client.host if request.client else "unknown"
     user_id = get_user_id(request)
-    
     auth_header = request.headers.get("Authorization")
     
     try:
-        result = run_nlp_pipeline(job_id=job_id, user_id=user_id, auth_header=auth_header)
+        result = run_nlp_pipeline(job_id=job_id, user_id=user_id, auth_header=auth_header,params={"is_ceims": is_ceims})
         
         if result.get("status") == "error":
             raise Exception(result.get("message"))
@@ -73,16 +73,15 @@ async def get_processed_articles(job_id: str, request: Request):
         print(f"Error in get_processed_articles for {user_id}: {e}")
         raise HTTPException(status_code=500, detail=f"S3 Retrieval Error: {str(e)}")
     
-@router.get("/processed-articles")
-async def get_global_processed_articles():
-    """Returns the global JSON file to populate the DynamoDB tables."""
+@router.get("/public/ceims-articles")
+def serve_public_ceims_data():
+    s3 = boto3.client('s3', region_name=config.REGION if hasattr(config, 'REGION') else "ap-southeast-2")
+    ceims_s3_key = "public/ceims/all_processed_articles.json"
+    
     try:
-        # fetch_processed_data in processor_v2 doesn't take arguments, so this works perfectly!
-        data = fetch_processed_data() 
-        
-        if "error" in data:
-            raise Exception(data["error"])
-            
-        return data
+        response = s3.get_object(Bucket=config.S3_BUCKET_NAME, Key=ceims_s3_key)
+        return json.loads(response['Body'].read().decode('utf-8'))
+    except s3.exceptions.NoSuchKey:
+        return []
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"S3 Retrieval Error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to read public data: {str(e)}")
