@@ -61,7 +61,8 @@ def process_articles():
     all_article_events = []
     article_events_by_year = defaultdict(list)
 
-    url = config.API_URL + "/data-processing/processed-articles"
+    url = config.PROCESS_URL + "/data-processing/processed-articles"
+    print(f"🔎 DEBUG: Requesting data from -> {url}")
     response = requests.get(url)
 
     if response.status_code == 200:
@@ -82,7 +83,7 @@ def process_statistics():
     all_lga_stats = []
     lga_stats_by_year = defaultdict(list)
 
-    url = config.API_URL + "/data-collection/collect-data"
+    url = config.COLLECT_URL + "/data-collection/collect-data"
     response = requests.get(url)
 
     if response.status_code == 200:

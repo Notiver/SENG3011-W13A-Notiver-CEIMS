@@ -8,10 +8,10 @@ SERVICES_DIR = os.path.abspath(os.path.join(DATA_PROCESSING_DIR, ".."))
 if DATA_PROCESSING_DIR not in sys.path:
     sys.path.append(DATA_PROCESSING_DIR)
 
-LGA_JSON_PATH = os.path.join(SERVICES_DIR, "data-retrieval", "SUBURB_TO_LGA_DATA.json")
+LGA_JSON_PATH = os.path.join(SERVICES_DIR, "data-retrieval", "utils", "SUBURB_TO_LGA_DATA.json")
 S3_BUCKET_NAME = "nsw-crime-data-bucket"
 REGION = "ap-southeast-2"
 PROFILE_NAME = "notiver"
 NEWS_BUCKET_NAME = "news"
 NLP_BUCKET_NAME = "nlp_processed"
-DATA_COLLECTION_URL = "http://127.0.0.1:8002/collect-articles"
+DATA_COLLECTION_URL = "http://127.0.0.1:8001/collect-articles"

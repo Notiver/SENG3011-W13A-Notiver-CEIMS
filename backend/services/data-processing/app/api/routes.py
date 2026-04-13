@@ -72,3 +72,17 @@ async def get_processed_articles(job_id: str, request: Request):
     except Exception as e:
         print(f"Error in get_processed_articles for {user_id}: {e}")
         raise HTTPException(status_code=500, detail=f"S3 Retrieval Error: {str(e)}")
+    
+@router.get("/processed-articles")
+async def get_global_processed_articles():
+    """Returns the global JSON file to populate the DynamoDB tables."""
+    try:
+        # fetch_processed_data in processor_v2 doesn't take arguments, so this works perfectly!
+        data = fetch_processed_data() 
+        
+        if "error" in data:
+            raise Exception(data["error"])
+            
+        return data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"S3 Retrieval Error: {str(e)}")
