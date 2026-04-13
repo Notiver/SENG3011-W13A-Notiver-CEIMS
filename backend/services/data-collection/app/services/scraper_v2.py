@@ -11,7 +11,7 @@ from aws_lambda_powertools import Tracer
 tracer = Tracer(service="data-collection")
 
 CATEGORY_CONFIG = {
-    "crime": {"query": "(police OR crime OR murder OR theft)", "section": "news|world|australia-news|uk-news"},
+    "crime": {"query": "(police OR crime OR murder OR theft)", "section": "news|world|australia-news"},
     "housing_prices": {"query": "(housing OR real estate OR property OR rent)", "section": "business|money|society"},
     "lifestyle": {"query": "(lifestyle OR culture OR events OR community)", "section": "lifeandstyle|culture"},
     "job_opportunities": {"query": "(jobs OR employment OR economy OR hiring)", "section": "business|money"},
@@ -81,7 +81,8 @@ def run_dynamic_scraper(location: str, time_frame: str, category: str, user_id: 
 
     url = "https://content.guardianapis.com/search"
     api_key = os.getenv("GUARDIAN_API_KEY", "test")    
-    article_urls = []
+    
+    article_data = {}
     
     for q in api_queries:
         params = {
@@ -101,17 +102,19 @@ def run_dynamic_scraper(location: str, time_frame: str, category: str, user_id: 
             if response.status_code == 200:
                 results = response.json().get("response", {}).get("results", [])
                 for item in results:
-                    article_urls.append(item.get('webUrl'))
+                    web_url = item.get('webUrl')
+                    # grab the date from the Guardian
+                    pub_date = item.get('webPublicationDate', datetime.now().isoformat())
+                    
+                    if web_url:
+                        article_data[web_url] = pub_date
             else:
                 print(f"API ERROR {response.status_code}: {response.text}")
                 print(f"DEBUG URL: {response.url}")
         except Exception as e:
             print(f"Guardian API Request failed for {q['from_date']}: {e}")
 
-    # Remove duplicates just in case Guardian returns the same article across boundaries
-    article_urls = list(set(article_urls))
-
-    print(f"Found {len(article_urls)} URLs. Scraping content...")
+    print(f"Found {len(article_data)} URLs. Scraping content...")
 
     try:
         s3 = boto3.client('s3')
@@ -122,7 +125,7 @@ def run_dynamic_scraper(location: str, time_frame: str, category: str, user_id: 
 
     scraped_data = []
 
-    for i, article_url in enumerate(article_urls):
+    for i, (article_url, real_publish_date) in enumerate(article_data.items()):
         try:
             article = newspaper.article(article_url)
             article.download()
@@ -144,7 +147,7 @@ def run_dynamic_scraper(location: str, time_frame: str, category: str, user_id: 
                     "file_key": s3_key,
                     "url": article_url,
                     "content": content,
-                    "metadata": {"publish_date": datetime.now().isoformat()}
+                    "metadata": {"publish_date": real_publish_date}
                 })
         except Exception as e:
             print(f"FAILED ON ARTICLE {article_url}: {e}")

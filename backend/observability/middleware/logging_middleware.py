@@ -9,9 +9,15 @@ metrics = Metrics(namespace="Notiver")
 start_time = time.time()
 
 async def observability_middleware(request: Request, call_next):
+    if request.method == "OPTIONS":
+        return await call_next(request)
     start = time.time()
 
-    caller_ip = request.client.host if request.client else "unknown"
+    try:
+        caller_ip = request.client.host if request.client else "unknown"
+    except Exception:
+        caller_ip = "unknown"
+
     endpoint = str(request.url.path)
     method = request.method
 

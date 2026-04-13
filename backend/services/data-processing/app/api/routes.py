@@ -5,7 +5,7 @@ import boto3
 import base64
 from pydantic import BaseModel
 from app import config 
-from app.services.processor_v2 import run_nlp_pipeline, fetch_processed_data
+from app.services.processor_v2 import fetch_processed_data
 router = APIRouter()
 
 class ScrapeRequest(BaseModel):
@@ -43,20 +43,31 @@ async def process_articles(job_id: str, request: Request, is_ceims: bool = False
     auth_header = request.headers.get("Authorization")
     
     try:
-        result = run_nlp_pipeline(job_id=job_id, user_id=user_id, auth_header=auth_header,params={"is_ceims": is_ceims})
+        sqs_client = boto3.client('sqs', region_name=getattr(config, 'REGION', "ap-southeast-2"))
         
-        if result.get("status") == "error":
-            raise Exception(result.get("message"))
-            
-        return {
-            "status": "success", 
-            "message": f"NLP Analysis complete for user: {user_id}",
+        # Package the details
+        message_body = {
             "job_id": job_id,
-            "details": result
+            "user_id": user_id,
+            "auth_header": auth_header,
+            "is_ceims": is_ceims
         }
+        
+        # Send to the queue
+        sqs_client.send_message(
+            QueueUrl=config.NLP_SQS_QUEUE_URL,
+            MessageBody=json.dumps(message_body)
+        )
+        
+        return {
+            "status": "processing", 
+            "message": "NLP Analysis queued in background.",
+            "job_id": job_id
+        }
+        
     except Exception as e:
         log_spam_event(caller_ip, "processing failure", f"/process-articles/{job_id}")
-        raise HTTPException(status_code=500, detail=f"Processing failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to queue processing job: {str(e)}")
 
 @router.get("/processed-articles/{job_id}")
 async def get_processed_articles(job_id: str, request: Request):
@@ -64,9 +75,6 @@ async def get_processed_articles(job_id: str, request: Request):
     
     try:
         data = fetch_processed_data(job_id=job_id, user_id=user_id)
-        
-        if "error" in data:
-            raise Exception(data["error"])
             
         return data
     except Exception as e:
