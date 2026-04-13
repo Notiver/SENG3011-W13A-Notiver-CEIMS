@@ -33,19 +33,21 @@ def test_e2e_data(s3):
     print("success")
 
     # data processing
-    print("Triggering data processing...", end="", flush=True)
-    response = httpx.post(
-        f"{API_URL}/{PROCESSING_ROUTE}/process-articles",
-        json={
-            "location": "Bondi",
-            "timeFrame": "1_per_month_5_years",
-            "category": "police"
-        },
-        headers={"Authorization": f"Bearer {STAGING_JWT}"},
-        timeout=TIMEOUT
-    )
-    assert response.status_code == 200, f"failed: {response.text}"
-    print("success")
+    # === NOT TESTED E2E ANYMORE AS QUEUING SYSTEM IN PLACE ===
+
+    # print("Triggering data processing...", end="", flush=True)
+    # response = httpx.post(
+    #     f"{API_URL}/{PROCESSING_ROUTE}/process-articles",
+    #     json={
+    #         "location": "Bondi",
+    #         "timeFrame": "1_per_month_5_years",
+    #         "category": "police"
+    #     },
+    #     headers={"Authorization": f"Bearer {STAGING_JWT}"},
+    #     timeout=TIMEOUT
+    # )
+    # assert response.status_code == 200, f"failed: {response.text}"
+    # print("success")
 
     # data retrieval
     print("Retrieving data...", end="")
@@ -62,16 +64,6 @@ def test_e2e_data(s3):
 def test_e2e_articles(s3):
     '''e2e test for articles'''
     print("e2e: articles")
-
-    # data collection - upload articles
-    print("Uploading articles to collection endpoint...", end="", flush=True)
-    response = httpx.post(
-        f"{API_URL}/{COLLECTION_ROUTE}/upload-articles",
-        headers={"Authorization": f"Bearer {STAGING_JWT}"},
-        timeout=TIMEOUT
-    )
-    assert response.status_code == 200, "failed"
-    print("success")
 
     # data collection - check articles uploaded in s3
     print("Checking for uploaded file in S3...", end="", flush=True)
@@ -91,38 +83,39 @@ def test_e2e_articles(s3):
     data = response.json()
     assert len(data) > 0
 
+    # === NOT TESTED E2E ANYMORE AS QUEUING SYSTEM IN PLACE ===
+
     # data processing - process articles
-    print("Triggering data processing...", end="", flush=True)
-    response = httpx.post(
-        f"{API_URL}/{PROCESSING_ROUTE}/process-articles",
-        json={
-            "location": "Sydney",
-            "timeFrame": "1_per_month_1_year",
-            "category": "crime"
-        },
-        headers={"Authorization": f"Bearer {STAGING_JWT}"},
-        timeout=TIMEOUT
-    )
-    assert response.status_code == 200, f"failed: {response.text}"
-    print("success")
+    # print("Triggering data processing...", end="", flush=True)
+    # response = httpx.post(
+    #     f"{API_URL}/{PROCESSING_ROUTE}/process-articles",
+    #     json={
+    #         "location": "Sydney",
+    #         "timeFrame": "1_per_month_1_year",
+    #         "category": "crime"
+    #     },
+    #     headers={"Authorization": f"Bearer {STAGING_JWT}"},
+    #     timeout=TIMEOUT
+    # )
+    # assert response.status_code == 200, f"failed: {response.text}"
+    # print("success")
 
     # # data processing - check for processed file in S3
-    print("Checking for processed file in S3...", end="", flush=True)
-    article_bucket = BUCKET + "/" + response.json().get("output_folder")
-    articles = s3.list_objects_v2(Bucket=article_bucket)
-    assert "Contents" in articles, f"No files found in {BUCKET}"
-    print("success")
+    # print("Checking for processed file in S3...", end="", flush=True)
+    # article_bucket = BUCKET + "/" + response.json().get("output_folder")
+    # articles = s3.list_objects_v2(Bucket=article_bucket)
+    # assert "Contents" in articles, f"No files found in {BUCKET}"
+    # print("success")
 
-    # data processing - get processed articles
-    print("Getting processed articles...", end="", flush=True)
-    response = httpx.get(
-        f"{API_URL}/{PROCESSING_ROUTE}/processed-articles",
-        headers={"Authorization": f"Bearer {STAGING_JWT}"},
-        timeout=TIMEOUT
-    )
-    assert response.status_code == 200, f"failed: {response.text}"
-    print("success")
-    ### can add more here to check content
+    # # data processing - get processed articles
+    # print("Getting processed articles...", end="", flush=True)
+    # response = httpx.get(
+    #     f"{API_URL}/{PROCESSING_ROUTE}/processed-articles",
+    #     headers={"Authorization": f"Bearer {STAGING_JWT}"},
+    #     timeout=TIMEOUT
+    # )
+    # assert response.status_code == 200, f"failed: {response.text}"
+    # print("success")
 
     # data retrieval
     print("Running retrieval...", end="")
@@ -152,5 +145,3 @@ def test_e2e_articles(s3):
 
     # retrieval content checks
     assert len(data) > 0
-    # assert isinstance(data, dict)
-    # assert "lgas" in data

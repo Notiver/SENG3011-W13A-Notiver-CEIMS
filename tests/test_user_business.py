@@ -3,7 +3,7 @@ from util_auth import STAGING_JWT
 
 from util_config import API_URL, RETRIEVAL_ROUTE, TIMEOUT
 
-LGA = "RANDWICK CITY COUNCIL"
+LGA = "Randwick%20City%20Council"
 
 def test_ac_1():
     """AC1: Comparing the statistical and sentiment scores for an LGA"""
