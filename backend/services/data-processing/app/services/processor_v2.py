@@ -19,6 +19,9 @@ except Exception:
 @tracer.capture_method
 def run_nlp_pipeline(job_id: str, user_id: str = "guest_user", auth_header: str = None, params: dict = None):  
     from transformers import pipeline  
+
+    is_ceims = params.get("is_ceims", False) if params else False
+
     print("Loading RoBERTa sentiment model...")
     with tracer.provider.in_subsegment("Load_RoBERTa_Model"):        
         sentiment_task = pipeline(
@@ -59,7 +62,7 @@ def run_nlp_pipeline(job_id: str, user_id: str = "guest_user", auth_header: str 
     print(f"Articles normalized and ready to process: {len(articles)}")
     
     if not articles:
-         return {"status": "success", "message": "No valid article objects found after normalization."}
+         return {"status": "success", "message": "No valid article objects found after normalisation."}
 
     processed_data = []
     skipped_count = 0
@@ -74,12 +77,27 @@ def run_nlp_pipeline(job_id: str, user_id: str = "guest_user", auth_header: str 
             continue
 
         try:
-            loc = get_location_metadata(text_content)
             offence = classify_crime(text_content)
+            if offence in ["General Crime", "Non-Crime", "None", "N/A"]:
+                offence = None 
             
-            if offence == "General Crime" and loc["suburb"] == "NSW General":
-                skipped_count += 1
-                continue
+            if is_ceims:
+                loc = get_location_metadata(text_content)
+                suburb = loc.get('suburb', 'Unknown')
+                lga = loc.get('lga', 'Unknown')
+                postcode = loc.get('postcode', '0000')
+                
+                if suburb.lower() in ["unknown", "uknown", "n/a", "none"]:
+                    skipped_count += 1
+                    continue
+                
+                if offence is None and suburb == "NSW General":
+                    skipped_count += 1
+                    continue
+            else:
+                suburb = "Global Location"
+                lga = "Global"
+                postcode = "0000"
             
             sentiment_results = sentiment_task(text_content[:1500])
             scores = {res['label'].lower(): round(res['score'], 4) for res in sentiment_results[0]} 
@@ -92,9 +110,9 @@ def run_nlp_pipeline(job_id: str, user_id: str = "guest_user", auth_header: str 
                 "offence_type": offence,
                 "sentiment_score": negative_sentiment,
                 "when": metadata.get('publish_date', datetime.now().isoformat()),
-                "suburb": loc['suburb'],
-                "lga": loc['lga'],
-                "postcode": loc['postcode'],
+                "suburb": suburb,
+                "lga": lga,
+                "postcode": postcode,
                 "url": article.get("url", "")
             }
             processed_data.append(entry)
