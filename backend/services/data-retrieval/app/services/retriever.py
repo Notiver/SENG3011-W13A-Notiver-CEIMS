@@ -56,7 +56,7 @@ def process_retrieval(dynamodb_resource=None, stage="staging"):
         lga_by_year_table
     )
 
-@tracer.capture_method
+@tracer.capture_method(capture_response=False)
 def process_articles():
     all_article_events = []
     article_events_by_year = defaultdict(list)
@@ -77,7 +77,7 @@ def process_articles():
 
     return all_article_events, article_events_by_year
 
-@tracer.capture_method
+@tracer.capture_method(capture_response=False)
 def process_statistics():
     all_lga_stats = []
     lga_stats_by_year = defaultdict(list)
