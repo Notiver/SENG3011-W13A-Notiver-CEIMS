@@ -7,12 +7,11 @@ from app.services.processor_v2 import run_nlp_pipeline, fetch_processed_data
 @pytest.fixture
 def mock_pipeline():
     """Mocks the heavy Hugging Face RoBERTa model so tests run instantly."""
-    with patch("app.services.processor_v2.pipeline") as mock:
+    with patch("transformers.pipeline") as mock:
         mock_instance = MagicMock()
         mock_instance.return_value = [[{"label": "negative", "score": 0.8500}]]
         mock.return_value = mock_instance
         yield mock
-
 @pytest.fixture
 def mock_s3():
     """Mocks the S3 client so we don't actually hit AWS."""
@@ -100,7 +99,6 @@ class TestRunNlpPipeline:
             "status": "complete",
             "articles": [
                 {"file_key": "news/123.txt", "content": "Bad crime happened.", "metadata": {}},
-                # Should be skipped
                 {"file_key": "news/empty.txt", "content": "", "metadata": {}}
             ]
         }
@@ -116,7 +114,14 @@ class TestRunNlpPipeline:
         mock_s3.put_object.assert_called_once()
         called_args = mock_s3.put_object.call_args[1]
         assert "users/jane_doe/processed_intelligence" in called_args["Key"]
-        assert "0.85" in called_args["Body"]
+        
+        # Parse the JSON string back into a python dict
+        uploaded_json = json.loads(called_args["Body"])
+        assert len(uploaded_json) == 1
+        assert uploaded_json[0]["object_id"] == "123"
+        
+        assert "sentiment_score" in uploaded_json[0]
+        assert isinstance(uploaded_json[0]["sentiment_score"], (float, int))
 
     def test_successful_public_ceims_job(self, mock_pipeline, mock_requests, mock_s3, mock_classifiers):
         """Tests the community pooling logic (GET -> Append -> PUT)"""
