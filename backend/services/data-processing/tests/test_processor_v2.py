@@ -169,7 +169,7 @@ class TestRunNlpPipeline:
             mock_loc.return_value = {"suburb": "NSW General", "lga": "Unknown", "postcode": ""}
             mock_crime.return_value = "General Crime"
             
-            result = run_nlp_pipeline(job_id="job-123")
+            result = run_nlp_pipeline(job_id="job-123", params={"is_ceims": True})
             
             assert result["status"] == "success"
             assert result["processed"] == 0
