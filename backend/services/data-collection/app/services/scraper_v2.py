@@ -26,9 +26,8 @@ def run_dynamic_scraper(location: str, time_frame: str, category: str, user_id: 
     print(f"Starting dynamic scrape for User: {user_id} | Loc: {location} | Cat: {category} | Time: {time_frame}")
     
     cat_config = CATEGORY_CONFIG.get(category, {"query": category, "section": None})
-    
-    clean_location = location.replace(", ", " AND ")
-    search_query = f'({clean_location}) AND {cat_config["query"]}'
+    primary_city = location.split(',')[0].strip()
+    search_query = f'"{primary_city}" AND {cat_config["query"]}'
     
     current_date = datetime.now()
     api_queries = []
@@ -133,6 +132,20 @@ def run_dynamic_scraper(location: str, time_frame: str, category: str, user_id: 
             content = article.text
             
             if content:
+                mention_count = content.lower().count(primary_city.lower())
+                
+                if mention_count < 3:
+                    print(f"Skipped (Not relevant enough): Mentioned '{primary_city}' only {mention_count} times.")
+                    continue
+            
+            real_title = article.title if article.title else "News Report"
+            
+            if article.publish_date:
+                final_date = article.publish_date.isoformat()
+            else:
+                final_date = real_publish_date
+            
+            if content:
                 safe_cat = category.replace(" ", "_")
                 s3_key = f"users/{user_id}/{config.NEWS_BUCKET_NAME}/{safe_cat}_{i}.txt"
                 
@@ -147,7 +160,8 @@ def run_dynamic_scraper(location: str, time_frame: str, category: str, user_id: 
                     "file_key": s3_key,
                     "url": article_url,
                     "content": content,
-                    "metadata": {"publish_date": real_publish_date}
+                    "title": real_title,  
+                    "metadata": {"publish_date": final_date} 
                 })
         except Exception as e:
             print(f"FAILED ON ARTICLE {article_url}: {e}")
