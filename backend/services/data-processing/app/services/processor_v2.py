@@ -75,12 +75,15 @@ def run_nlp_pipeline(job_id: str, user_id: str = "guest_user", auth_header: str 
         if not text_content:
             skipped_count += 1
             continue
-
         try:
             offence = classify_crime(text_content)
-            if offence in ["General Crime", "Non-Crime", "None", "N/A"]:
-                offence = None 
             
+            if file_key and "crime" not in file_key.lower():
+                offence = None
+
+            if offence in ["General Crime", "Non-Crime", "None", "N/A"]:
+                offence = None
+                
             if is_ceims:
                 loc = get_location_metadata(text_content)
                 suburb = loc.get('suburb', 'Unknown')
