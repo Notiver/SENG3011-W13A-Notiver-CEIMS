@@ -39,9 +39,11 @@ export default function ScraperTab() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [processStep, setProcessStep] = useState(0);
 
+  const [scrapeProgress, setScrapeProgress] = useState(0);
+  const [processProgress, setProcessProgress] = useState(0);
+
   const terminalEndRef = useRef<HTMLDivElement>(null);
 
-  // Helper to calculate expected articles for the UI
   const getExpectedCount = (tf: string) => {
     if (tf === "1_per_month_5_years") return 60;
     if (tf === "5_per_month_1_year") return 60;
@@ -49,7 +51,38 @@ export default function ScraperTab() {
     return "Target";
   };
 
-  // Typewriter / Cascading effect for Real Articles
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isPolling) {
+      interval = setInterval(() => {
+        setScrapeProgress((prev) => {
+          if (prev >= 95) return prev;
+          const increment = Math.random() * 2 + 1;
+          return Math.min(prev + increment, 95);
+        });
+      }, 500);
+    } else if (!loading && fullScrapedArticles.length > 0) {
+      setScrapeProgress(100);
+    }
+    return () => clearInterval(interval);
+  }, [isPolling, loading, fullScrapedArticles.length]);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isProcessing && processStep === 1) {
+      interval = setInterval(() => {
+        setProcessProgress((prev) => {
+          if (prev >= 98) return prev;
+          const increment = Math.random() * 0.8 + 0.2; 
+          return Math.min(prev + increment, 98);
+        });
+      }, 500);
+    } else if (processStep >= 2) {
+      setProcessProgress(100);
+    }
+    return () => clearInterval(interval);
+  }, [isProcessing, processStep]);
+
   useEffect(() => {
     if (!isFallback && !isProcessing && fullScrapedArticles.length > 0 && scrapedArticles.length < fullScrapedArticles.length) {
       const timer = setTimeout(() => {
@@ -73,7 +106,6 @@ export default function ScraperTab() {
       terminalEndRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
   }, [visibleFallbackUrls, scrapedArticles]);
-
 
   const triggerFallbackOverride = async (errorMsg: any) => {
     console.error("Scraper Error - Initiating Fallback Override:", errorMsg);
@@ -119,6 +151,33 @@ export default function ScraperTab() {
     lgaDropdown();
   }, []);
 
+  const pollForProcessingResults = async (jobId: string) => {
+    try {
+      const finalData = await api.getProcessedArticles(jobId);
+      
+      if (!finalData || finalData.error) {
+         setTimeout(() => pollForProcessingResults(jobId), 5000);
+         return;
+      }
+      
+      setProcessStep(2);
+      setProcessedIntelligence(finalData);
+
+      await api.runRetrieval();
+      setProcessStep(3);
+      setIsProcessing(false);
+      
+    } catch (error: any) {
+      const errorMsg = error.message || String(error);
+      if (errorMsg.includes("not found") || errorMsg.includes("404")) {
+         setTimeout(() => pollForProcessingResults(jobId), 5000);
+      } else {
+         console.error("NLP Processing fatally failed:", error);
+         setIsProcessing(false);
+      }
+    }
+  };
+
   const lgaDropdown = async () => {
     try {
       const data = await api.getAllLgas();
@@ -139,7 +198,6 @@ export default function ScraperTab() {
       setLocation(allLgas.length > 0 ? allLgas[0] : "");
     }
   };
-  
 
   const handleScrape = async () => {
     setLoading(true);
@@ -148,6 +206,7 @@ export default function ScraperTab() {
     setIsFallback(false);
     setIsProcessing(false);
     setProcessStep(0);
+    setScrapeProgress(0);
     
     setFullScrapedArticles([]);
     setScrapedArticles([]);
@@ -167,7 +226,6 @@ export default function ScraperTab() {
       console.log("Initial API Response:", data);
       
       if (data.status === "processing" && data.job_id) {
-        // SQS receipted. Start polling.
         setCurrentJobId(data.job_id);
         setIsPolling(true);
         pollForJobResults(data.job_id);
@@ -181,8 +239,6 @@ export default function ScraperTab() {
       }
     } catch (error) {
       triggerFallbackOverride(error);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -190,21 +246,20 @@ export default function ScraperTab() {
     if (!currentJobId) return;
     setIsProcessing(true);
     setProcessStep(1);
+    setProcessProgress(0);
 
     try {
       const isCeimsMode = locationMode === "ceims";
-      await api.processArticles(currentJobId, isCeimsMode);
-      setProcessStep(2);
-
-      const finalData = await api.getProcessedArticles(currentJobId);
-      setProcessedIntelligence(finalData);
-
-      await api.runRetrieval();
-      setProcessStep(3);
+      const response = await api.processArticles(currentJobId, isCeimsMode);
+      
+      if (response.status === "processing") {
+        pollForProcessingResults(currentJobId);
+      } else {
+        throw new Error("Failed to queue NLP job.");
+      }
       
     } catch (error) {
       console.error("Pipeline failed:", error);
-    } finally {
       setIsProcessing(false);
     }
   };
@@ -254,8 +309,6 @@ export default function ScraperTab() {
         <p className="text-zinc-400 mt-2">Target news vectors for automated intelligence gathering.</p>
       </header>
       
-
-      {/* Category Selection Container */}
       <div className="space-y-4">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {CEIMS_CATEGORIES.map((cat) => (
@@ -314,7 +367,6 @@ export default function ScraperTab() {
         )}
       </div>
 
-      {/* Search Parameters Configuration */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-zinc-900/40 p-5 rounded-2xl border border-zinc-800/80 shadow-inner">
         <div>
           <div className="flex justify-between items-center mb-2">
@@ -344,12 +396,10 @@ export default function ScraperTab() {
             className={`w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 transition-colors appearance-none ${(loading || isProcessing) ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
           >
             {locationMode === "global" ? (
-              // Map Global Cities
               MAJOR_CITIES.map((city) => (
                 <option key={city} value={city}>{city}</option>
               ))
             ) : (
-              // Map Fetched LGAs
               allLgas.length > 0 ? (
                 allLgas.map((lga, idx) => (
                   <option key={idx} value={lga}>{lga}</option>
@@ -413,19 +463,9 @@ export default function ScraperTab() {
             <Download className="w-4 h-4" /> Download Intelligence (JSON)
           </button>
         )}
-
-        {isFallback && !isProcessing && (
-          <div className="flex items-center gap-2 ml-auto text-emerald-400 text-[8px] font-bold tracking-widest uppercase animate-in fade-in">
-            <span className="relative flex h-3 w-3">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
-            </span>
-            Live Feed Active
-          </div>
-        )}
       </div>
 
-      {/* --- SCRAPING LOADING STATE MONITOR --- */}
+      {/* SCRAPING LOADING STATE MONITOR */}
       {(loading || isPolling) && (
         <div className="space-y-4 animate-in fade-in duration-300">
           <h3 className="text-zinc-400 font-bold uppercase text-xs tracking-widest">Active Scrape Monitor</h3>
@@ -447,6 +487,22 @@ export default function ScraperTab() {
                 </div>
                 <div className="text-zinc-400 animate-in slide-in-from-left-2 duration-300 delay-100">
                   [Worker] Cloud lambda awakened. Fetching ~{getExpectedCount(activeParams.timeFrame)} target articles...
+                </div>
+
+                {/*  Visual Scraping Progress Bar */}
+                <div className="mt-4 animate-in fade-in duration-500">
+                  <div className="flex justify-between text-[10px] text-zinc-500 mb-1 font-bold tracking-widest uppercase">
+                    <span>Extraction Progress</span>
+                    <span>{Math.round(scrapeProgress)}%</span>
+                  </div>
+                  <div className="w-full bg-zinc-900 rounded-full h-1.5 border border-zinc-800 overflow-hidden">
+                    <div 
+                      className="bg-emerald-500 h-1.5 rounded-full transition-all duration-700 ease-out relative" 
+                      style={{ width: `${scrapeProgress}%` }}
+                    >
+                      <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
+                    </div>
+                  </div>
                 </div>
               </>
             )}
@@ -513,9 +569,43 @@ export default function ScraperTab() {
           <h3 className="text-zinc-400 font-bold uppercase text-xs tracking-widest">Pipeline Status</h3>
           <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-6 font-mono text-sm space-y-4 shadow-inner">
             <div className="text-zinc-600">[System] Initialising data collection microservice...</div>
-            {processStep >= 1 && <div className={`flex items-center gap-3 animate-in slide-in-from-left-2 duration-300 ${processStep >= 2 ? "text-zinc-400" : "text-yellow-400 animate-pulse"}`}><span>{processStep >= 2 ? "✅" : "⏳"}</span><span>Parsing BOSCAR DATA...</span></div>}
-            {processStep >= 2 && <div className={`flex items-center gap-3 animate-in slide-in-from-left-2 duration-300 ${processStep >= 3 ? "text-zinc-400" : "text-yellow-400 animate-pulse"}`}><span>{processStep >= 3 ? "✅" : "⏳"}</span><span>Uploading to S3...</span></div>}
-            {processStep >= 3 && <div className="text-emerald-500 font-bold mt-6 pt-4 border-t border-zinc-800/50 animate-in fade-in duration-500">[Success] Intelligence compilation complete. Data is ready for geographic mapping.</div>}
+            {processStep >= 1 && (
+              <div className={`flex flex-col gap-2 animate-in slide-in-from-left-2 duration-300 ${processStep >= 2 ? "text-zinc-400" : "text-yellow-400 animate-pulse"}`}>
+                <div className="flex items-center gap-3">
+                  <span>{processStep >= 2 ? "✅" : "⏳"}</span>
+                  <span>{processStep >= 2 ? "NLP Analysis Complete" : "Running RoBERTa NLP Model in Cloud (Takes ~80s)..."}</span>
+                </div>
+                
+                {/* Visual NLP Progress Bar */}
+                {processStep === 1 && (
+                  <div className="mt-2 ml-7 max-w-md animate-in fade-in duration-500">
+                    <div className="flex justify-between text-[10px] text-zinc-500 mb-1 font-bold tracking-widest uppercase">
+                      <span>AI Inference Progress</span>
+                      <span>{Math.round(processProgress)}%</span>
+                    </div>
+                    <div className="w-full bg-zinc-900 rounded-full h-1.5 border border-zinc-800 overflow-hidden">
+                      <div 
+                        className="bg-indigo-500 h-1.5 rounded-full transition-all duration-700 ease-out relative" 
+                        style={{ width: `${processProgress}%` }}
+                      >
+                        <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            {processStep >= 2 && (
+              <div className={`flex items-center gap-3 animate-in slide-in-from-left-2 duration-300 ${processStep >= 3 ? "text-zinc-400" : "text-yellow-400 animate-pulse"}`}>
+                <span>{processStep >= 3 ? "✅" : "⏳"}</span>
+                <span>Uploading to S3...</span>
+              </div>
+            )}
+            {processStep >= 3 && (
+              <div className="text-emerald-500 font-bold mt-6 pt-4 border-t border-zinc-800/50 animate-in fade-in duration-500">
+                [Success] Intelligence compilation complete. Data is ready for geographic mapping.
+              </div>
+            )}
           </div>
         </div>
       )}
