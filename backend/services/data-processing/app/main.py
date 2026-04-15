@@ -15,7 +15,8 @@ from fastapi.middleware.cors import CORSMiddleware
 patch_all()
 tracer = Tracer(service="data-processing")
 metrics = Metrics(namespace="Notiver", service="data-processing")
-app = FastAPI(title="Notiver NLP Processing API")
+stage = os.getenv("STAGE", "staging")
+app = FastAPI(title="Notiver NLP Processing API", root_path=f"/{stage}/data-processing")
 
 # metrics.set_default_dimensions(service="data-processing")
 

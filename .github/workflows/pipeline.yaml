@@ -99,11 +99,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
-      # - name: Set up Python
-      #   uses: actions/setup-python@v5
-      #   with:
-      #     python-version: "3.11"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -122,9 +117,6 @@ jobs:
           ECR_REPOSITORY: notiver-data-collection
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          TARGET_STAGE=${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}
-          echo "Detected state: $TARGET_STAGE"
-
           docker build \
             --provenance=false \
             --platform linux/amd64 \
@@ -140,11 +132,6 @@ jobs:
             --image-uri $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
           aws lambda wait function-updated --function-name data-collection-function
-
-          aws lambda update-alias \
-            --function-name data-collection-function \
-            --name $TARGET_STAGE \
-            --function-version \$LATEST
   
       - name: Build, tag, and push data-processing image
         env:
@@ -152,9 +139,6 @@ jobs:
           ECR_REPOSITORY: notiver-nlp-processor
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          TARGET_STAGE=${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}
-          echo "Detected state: $TARGET_STAGE"
-
           docker build \
             --provenance=false \
             --platform linux/amd64 \
@@ -169,12 +153,12 @@ jobs:
             --function-name data-nlp-analytics \
             --image-uri $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
+          aws lambda update-function-code \
+            --function-name data-nlp-worker \
+            --image-uri $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+            
           aws lambda wait function-updated --function-name data-nlp-analytics
-
-          aws lambda update-alias \
-            --function-name data-nlp-analytics \
-            --name $TARGET_STAGE \
-            --function-version \$LATEST
+          aws lambda wait function-updated --function-name data-nlp-worker
 
       - name: Build, tag and push data-retrieval image
         env:
@@ -182,9 +166,6 @@ jobs:
           ECR_REPOSITORY: notiver-data-retrieval
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          TARGET_STAGE=${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}
-          echo "Detected state: $TARGET_STAGE"
-
           docker build \
             --provenance=false \
             --platform linux/amd64 \
@@ -201,16 +182,11 @@ jobs:
 
           aws lambda wait function-updated --function-name data-retrieval-function
 
-          aws lambda update-alias \
-            --function-name data-retrieval-function \
-            --name $TARGET_STAGE \
-            --function-version \$LATEST
-  
-
-  deploy-to-environment:
+  push-to-staging:
     needs: deploy-to-aws
     runs-on: ubuntu-latest
     if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging') && github.event_name == 'push'
+    environment: staging
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -222,39 +198,12 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-southeast-2
 
-      - name: Set Stage Variable
+      - name: Update Lambda Aliases to Staging environment
         run: |
-          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-            echo "TARGET_STAGE=production" >> $GITHUB_ENV
-          else
-            echo "TARGET_STAGE=staging" >> $GITHUB_ENV
-          fi
-
-      - name: Grant API Gateway permission to invoke Aliases
-        run: |
-          aws lambda add-permission \
-            --function-name data-collection-function \
-            --statement-id AllowAPIGatewayInvoke-${TARGET_STAGE} \
-            --action lambda:InvokeFunction \
-            --principal apigateway.amazonaws.com \
-            --source-arn "$API_SOURCE_ARN" \
-            --qualifier $TARGET_STAGE || true
-            
-          aws lambda add-permission \
-            --function-name data-nlp-analytics \
-            --statement-id AllowAPIGatewayInvoke-${TARGET_STAGE} \
-            --action lambda:InvokeFunction \
-            --principal apigateway.amazonaws.com \
-            --source-arn "$API_SOURCE_ARN" \
-            --qualifier $TARGET_STAGE || true
-            
-          aws lambda add-permission \
-            --function-name data-retrieval-function \
-            --statement-id AllowAPIGatewayInvoke-${TARGET_STAGE} \
-            --action lambda:InvokeFunction \
-            --principal apigateway.amazonaws.com \
-            --source-arn "$API_SOURCE_ARN" \
-            --qualifier $TARGET_STAGE || true
+          aws lambda update-alias --function-name data-collection-function --name staging --function-version \$LATEST
+          aws lambda update-alias --function-name data-nlp-analytics --name staging --function-version \$LATEST
+          aws lambda update-alias --function-name data-nlp-worker --name staging --function-version \$LATEST
+          aws lambda update-alias --function-name data-retrieval-function --name staging --function-version \$LATEST
 
       - name: Inject AWS Account ID into OpenAPI spec
         run: |
@@ -270,8 +219,38 @@ jobs:
         run: |
           aws apigatewayv2 create-deployment \
             --api-id hbjyijsell \
-            --stage-name $TARGET_STAGE
+            --stage-name staging
 
+  push-to-production:
+    needs: push-to-staging
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-southeast-2
+
+      - name: Update from Staging to Production environment
+        run: |
+          STAGING_VER=$(aws lambda get-alias --function-name data-retrieval-function --name staging --query 'FunctionVersion' --output text)
+  
+          aws lambda update-alias --function-name data-collection-function --name production --function-version $STAGING_VER
+          aws lambda update-alias --function-name data-nlp-analytics --name production --function-version $STAGING_VER
+          aws lambda update-alias --function-name data-nlp-worker --name production --function-version $STAGING_VER
+          aws lambda update-alias --function-name data-retrieval-function --name production --function-version $STAGING_VER
+
+      - name: Create API Deployment
+        run: |
+          aws apigatewayv2 create-deployment \
+          --api-id hbjyijsell \
+          --stage-name production
 
       - name: Install observability dependencies
         if: github.ref == 'refs/heads/main'
