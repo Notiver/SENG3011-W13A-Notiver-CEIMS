@@ -6,10 +6,6 @@ from app import config
 
 router = APIRouter()
 
-# -------------------------------------------------------------------
-# INTERNAL ROUTES (Hidden from Sathish's Swagger UI)
-# -------------------------------------------------------------------
-
 @router.get("/", include_in_schema=False)
 def root():
     return {"message": "Data Retrieval Service is running"}
@@ -44,10 +40,6 @@ def get_public_ceims_articles():
     except Exception as e:
         print(f"Failed to fetch public CEIMS data from Processing API: {e}")
         return {"status": "success", "count": 0, "articles": []}
-
-# -------------------------------------------------------------------
-# PUBLIC API INTEGRATION ROUTES (Visible on Swagger UI)
-# -------------------------------------------------------------------
 
 @router.get("/lgas", summary="List All Supported Regions (LGAs)")
 def get_all_lgas(env=Depends(get_db_environment)):
