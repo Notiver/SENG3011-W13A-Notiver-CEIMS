@@ -243,6 +243,16 @@ jobs:
           aws lambda update-alias --function-name data-nlp-worker --name production --function-version $STAGING_VER
           aws lambda update-alias --function-name data-retrieval-function --name production --function-version $STAGING_VER
 
+      - name: Inject AWS Account ID into OpenAPI spec
+        run: |
+          sed -i "s/\${AWS_ACCOUNT_ID}/${{ secrets.AWS_ACCOUNT_ID }}/g" backend/infrastructure/openapi.yaml
+
+      - name: Deploy API Gateway
+        run: |
+          aws apigatewayv2 reimport-api \
+            --api-id hbjyijsell \
+            --body file://backend/infrastructure/openapi.yaml
+
       - name: Create API Deployment
         run: |
           aws apigatewayv2 create-deployment \
