@@ -234,14 +234,14 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-southeast-2
 
-      - name: Update from Staging to Production environment
+      - name: Promote Staging to Production
         run: |
-          STAGING_VER=$(aws lambda get-alias --function-name data-retrieval-function --name staging --query 'FunctionVersion' --output text)
-  
-          aws lambda update-alias --function-name data-collection-function --name production --function-version $STAGING_VER
-          aws lambda update-alias --function-name data-nlp-analytics --name production --function-version $STAGING_VER
-          aws lambda update-alias --function-name data-nlp-worker --name production --function-version $STAGING_VER
-          aws lambda update-alias --function-name data-retrieval-function --name production --function-version $STAGING_VER
+          functions=("data-collection-function" "data-nlp-analytics" "data-nlp-worker" "data-retrieval-function")
+          for fn in "${functions[@]}"; do
+            VERSION=$(aws lambda get-alias --function-name $fn --name staging --query 'FunctionVersion' --output text)
+            echo "Promoting $fn version $VERSION from Staging to Production"
+            aws lambda update-alias --function-name $fn --name production --function-version $VERSION
+          done
 
       - name: Inject AWS Account ID into OpenAPI spec
         run: |

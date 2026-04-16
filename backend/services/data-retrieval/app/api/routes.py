@@ -4,7 +4,7 @@ from app.services.retriever import process_retrieval
 from utils.db_manager import get_db_environment
 from app import config
 
-router = APIRouter()
+router = APIRouter(prefix="/data-retrieval")
 
 @router.get("/")
 def root():

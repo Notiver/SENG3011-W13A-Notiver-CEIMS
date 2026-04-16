@@ -15,12 +15,8 @@ from fastapi.middleware.cors import CORSMiddleware
 patch_all()
 tracer = Tracer(service="data-collection")
 metrics = Metrics(namespace="Notiver", service="data-collection")
+app = FastAPI(title="Notiver Collection API")
 
-stage = os.getenv("STAGE", "staging")
-app = FastAPI(
-    title="Notiver Collection API",
-    root_path=f"/{stage}/data-collection" 
-)
 # metrics.set_default_dimensions(service="data-collection")
 
 app.add_middleware(
@@ -41,11 +37,10 @@ app.add_middleware(SlowAPIMiddleware)
 app.middleware("http")(observability_middleware)
 
 app.include_router(router)
-stage = os.getenv("STAGE", "staging")
-_mangum_handler = Mangum(app, lifespan="off", api_gateway_base_path=f"/{stage}/data-collection")
+# stage = os.getenv("STAGE", "staging")
+# _mangum_handler = Mangum(app, lifespan="off", api_gateway_base_path=f"/{stage}/data-collection")
 
 @tracer.capture_lambda_handler
 def handler(event, context):
-    stage = os.getenv("STAGE", "staging")
-    _mangum_handler = Mangum(app, lifespan="off", api_gateway_base_path=f"/{stage}/data-collection")
+    _mangum_handler = Mangum(app, lifespan="off")
     return _mangum_handler(event, context)
