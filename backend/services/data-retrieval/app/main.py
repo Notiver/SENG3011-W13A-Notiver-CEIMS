@@ -14,11 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 patch_all()
 tracer = Tracer(service="data-retrieval")
 metrics = Metrics(namespace="Notiver", service="data-retrieval")
-stage = os.getenv("STAGE", "staging")
-app = FastAPI(
-    title="Notiver Retrieval API",
-    root_path=f"/{stage}/data-retrieval" 
-)
+app = FastAPI(title="Notiver Retrieval API")
 
 # metrics.set_default_dimensions(service="data-retrieval")
 
