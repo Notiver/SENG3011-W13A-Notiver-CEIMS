@@ -1,5 +1,4 @@
 import os
-
 from fastapi import FastAPI
 from app.api.routes import router
 from mangum import Mangum
@@ -15,8 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 patch_all()
 tracer = Tracer(service="data-processing")
 metrics = Metrics(namespace="Notiver", service="data-processing")
-stage = os.getenv("STAGE", "staging")
-app = FastAPI(title="Notiver NLP Processing API", root_path=f"/{stage}/data-processing")
+app = FastAPI(title="Notiver NLP Processing API")
 
 # metrics.set_default_dimensions(service="data-processing")
 
@@ -39,10 +37,9 @@ app.middleware("http")(observability_middleware)
 
 app.include_router(router)
 stage = os.getenv("STAGE", "staging")
-_mangum_handler = Mangum(app, lifespan="off", api_gateway_base_path=f"/{stage}/data-processing")
+# _mangum_handler = Mangum(app, lifespan="off", api_gateway_base_path=f"/{stage}/data-processing")
 
 @tracer.capture_lambda_handler
 def handler(event, context):
-    stage = os.getenv("STAGE", "staging")
-    _mangum_handler = Mangum(app, lifespan="off", api_gateway_base_path=f"/{stage}/data-processing")
+    _mangum_handler = Mangum(app, lifespan="off", api_gateway_base_path=f"/{stage}")
     return _mangum_handler(event, context)

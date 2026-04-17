@@ -14,7 +14,7 @@ from app import config
 from observability.middleware.logging_middleware import log_storage_event, log_spam_event
 from app.services.article_manager import execute_full_collection, fetch_collection_status
 
-router = APIRouter()
+router = APIRouter(prefix="/data-collection")
 SQS_QUEUE_URL = os.getenv("SQS_QUEUE_URL")
 
 def get_user_id(request: Request) -> str:

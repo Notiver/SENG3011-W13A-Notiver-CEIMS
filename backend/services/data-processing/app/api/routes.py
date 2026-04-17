@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from app import config 
 from app.services.processor_v2 import fetch_processed_data
 
-router = APIRouter()
+router = APIRouter(prefix="/data-processing")
 
 class ScrapeRequest(BaseModel):
     location: str

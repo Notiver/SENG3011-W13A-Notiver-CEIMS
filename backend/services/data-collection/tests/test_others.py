@@ -18,6 +18,8 @@ from app.database.s3 import (
     fetch_all_articles
 )
 
+PREFIX="/data-collection"
+
 @patch('app.utils.fetch_urls.time.sleep') # Mocks sleep so the test runs instantly
 @patch('app.utils.fetch_urls.requests.get')
 def test_get_random_monthly_articles_happy_path(mock_get, mock_sleep):

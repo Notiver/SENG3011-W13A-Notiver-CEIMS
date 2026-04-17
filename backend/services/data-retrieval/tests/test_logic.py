@@ -9,6 +9,8 @@ from app.services.retriever import (
     stat_score
 )
 
+PREFIX="/data-retrieval"
+
 class TestRetrieverMathLogic:
     def test_count_total_articles(self):
         """Tests that articles are counted correctly per LGA, ignoring missing LGAs."""

@@ -8,6 +8,8 @@ from unittest.mock import patch
 from app.main import app 
 from app import config
 
+PREFIX="/data-collection"
+
 client = TestClient(app)
 
 @pytest.fixture
@@ -47,7 +49,7 @@ def test_upload_data_integration_success(mock_process_data, mock_s3_env):
     
     with open(file_path, "rb") as f:
         response = client.post(
-            "/upload-data",
+            f"{PREFIX}/upload-data",
             files={"my_file": (
                 "LGA_trends.xlsx", 
                 f, 
@@ -71,7 +73,7 @@ def test_upload_data_invalid_file_type():
     fake_file_content = b"This is not an excel file."
     
     response = client.post(
-        "/upload-data",
+        f"{PREFIX}/upload-data",
         files={"my_file": ("fake_file.txt", fake_file_content, "text/plain")}
     )
 
@@ -89,7 +91,7 @@ def test_upload_data_s3_crash(mock_process):
     
     with open(file_path, "rb") as f:
         response = client.post(
-            "/upload-data",
+            f"{PREFIX}/upload-data",
             files={"my_file": ("LGA_trends.xlsx", f, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
         )
 
