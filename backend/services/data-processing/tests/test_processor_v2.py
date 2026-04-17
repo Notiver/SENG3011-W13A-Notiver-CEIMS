@@ -3,6 +3,7 @@ import json
 from unittest.mock import patch, MagicMock
 from app.services.processor_v2 import run_nlp_pipeline, fetch_processed_data
 
+PREFIX="/data-processing"
 
 @pytest.fixture
 def mock_pipeline():

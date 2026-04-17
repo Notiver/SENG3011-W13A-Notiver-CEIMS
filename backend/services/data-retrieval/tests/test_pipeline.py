@@ -6,6 +6,8 @@ from unittest.mock import patch, MagicMock
 # Adjust the import path based on your folder structure
 from app.services.retriever import process_retrieval, PipelineError
 
+PREFIX="/data-retrieval"
+
 @mock_aws
 @patch('app.services.retriever.requests.get')
 @patch.dict('app.services.retriever.LGA_FORMAT_MAP', {'SYDNEY': 'Sydney'})

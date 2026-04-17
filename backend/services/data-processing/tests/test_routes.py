@@ -3,6 +3,8 @@ from fastapi.testclient import TestClient
 from unittest.mock import patch, MagicMock
 from app.main import app
 
+PREFIX="/data-processing"
+
 client = TestClient(app)
 
 # Generates a fake JWT header
@@ -14,7 +16,7 @@ def auth_headers():
 class TestProcessRoutes:
 
     def test_root_endpoint(self):
-        response = client.get("/")
+        response = client.get(f"{PREFIX}/")
         assert response.status_code == 200
         data = response.json()
         assert "Data Processing Service is running" in data["message"]
@@ -29,7 +31,7 @@ class TestProcessRoutes:
         mock_boto3.return_value = mock_sqs
         
         response = client.post(
-            "/process-articles/mock-job-123", 
+            f"{PREFIX}/process-articles/mock-job-123", 
             headers=auth_headers
         )
         
@@ -50,7 +52,7 @@ class TestProcessRoutes:
         mock_sqs = MagicMock()
         mock_boto3.return_value = mock_sqs
         
-        response = client.post("/process-articles/mock-job-123")
+        response = client.post(f"{PREFIX}/process-articles/mock-job-123")
         
         assert response.status_code == 200
         assert response.json()["status"] == "processing"
@@ -71,7 +73,7 @@ class TestProcessRoutes:
             "s3_key": "users/test_jane/processed_intelligence/mock-job-123_processed.json"
         }
         
-        response = client.get("/processed-articles/mock-job-123", headers=auth_headers)
+        response = client.get(f"{PREFIX}/processed-articles/mock-job-123", headers=auth_headers)
         
         assert response.status_code == 200
         assert response.json()["processed"] == 5
@@ -82,7 +84,7 @@ class TestProcessRoutes:
         # Mock the scenario where S3 doesn't have the file yet
         mock_fetch.return_value = {"error": "Processed data not found for this job."}
         
-        response = client.get("/processed-articles/invalid-job-404", headers=auth_headers)
+        response = client.get(f"{PREFIX}/processed-articles/invalid-job-404", headers=auth_headers)
         
         assert response.status_code == 200
         assert "Processed data not found" in response.json()["error"]
