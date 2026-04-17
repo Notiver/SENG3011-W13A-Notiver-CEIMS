@@ -6,6 +6,8 @@ from app.main import app
 from utils.db_manager import get_db_environment
 from unittest.mock import patch
 
+PREFIX="/data-retrieval"
+
 client = TestClient(app)
 
 @pytest.fixture
@@ -59,7 +61,7 @@ def mock_db():
 
 def test_get_lga_stats_success(mock_db):
     """Integration Test: API successfully queries DynamoDB and returns data."""
-    response = client.get("/lga/Sydney")
+    response = client.get(f"{PREFIX}/lga/Sydney")
     
     assert response.status_code == 200
     data = response.json()
@@ -68,13 +70,13 @@ def test_get_lga_stats_success(mock_db):
 
 def test_get_lga_stats_not_found(mock_db):
     """Integration Test: API handles missing DynamoDB records correctly."""
-    response = client.get("/lga/Nowhere")
+    response = client.get(f"{PREFIX}/lga/Nowhere")
     
     assert response.status_code == 404
     assert response.json() == {"detail": "LGA not found"}
     
 def test_root_endpoint():
-    response = client.get("/")
+    response = client.get(f"{PREFIX}/")
     assert response.status_code == 200
     assert response.json() == {"message": "Data Retrieval Service is running"}
     
@@ -84,7 +86,7 @@ def test_run_retrieval_success(mock_process, mock_db):
     # We mock process_retrieval so we don't accidentally run the whole heavy pipeline during an API test
     mock_process.return_value = None 
     
-    response = client.post("/run-retrieval")
+    response = client.post(f"{PREFIX}/run-retrieval")
     assert response.status_code == 200
     assert response.json() == {"message": "retrieval pipeline completed"}
     mock_process.assert_called_once()
@@ -95,13 +97,13 @@ def test_run_retrieval_exception(mock_process, mock_db):
     # Force the mock to raise an error
     mock_process.side_effect = Exception("Simulated pipeline crash")
     
-    response = client.post("/run-retrieval")
+    response = client.post(f"{PREFIX}/run-retrieval")
     assert response.status_code == 500
     assert "Simulated pipeline crash" in response.json()["detail"]
 
 def test_get_all_lgas_success(mock_db):
     """Tests that scan() successfully returns a list of LGAs."""
-    response = client.get("/lgas")
+    response = client.get(f"{PREFIX}/lgas")
     assert response.status_code == 200
     # Because our mock_db seeded "Sydney", we expect it here!
     assert response.json() == {"lgas": ["Sydney"]}
@@ -109,7 +111,7 @@ def test_get_all_lgas_success(mock_db):
 
 def test_get_lga_yearly_success(mock_db):
     """Tests the query() successfully pulls yearly data."""
-    response = client.get("/lga/Sydney/yearly")
+    response = client.get(f"{PREFIX}/lga/Sydney/yearly")
     assert response.status_code == 200
     data = response.json()
     assert len(data) == 1
@@ -130,16 +132,16 @@ def test_dynamodb_500_exceptions():
     }
     
     # Test /lgas exception
-    resp_all = client.get("/lgas")
+    resp_all = client.get(f"{PREFIX}/lgas")
     assert resp_all.status_code == 500
     assert "Database connection lost!" in resp_all.json()["detail"]
     
     # Test /lga/{lga} exception
-    resp_single = client.get("/lga/Sydney")
+    resp_single = client.get(f"{PREFIX}/lga/Sydney")
     assert resp_single.status_code == 500
     
     # Test /lga/{lga}/yearly exception
-    resp_yearly = client.get("/lga/Sydney/yearly")
+    resp_yearly = client.get(f"{PREFIX}/lga/Sydney/yearly")
     assert resp_yearly.status_code == 500
     
     # Clean up the override so it doesn't break other tests!

@@ -11,6 +11,8 @@ from app.main import app
 from app import config
 from app.api import routes
 
+PREFIX="/data-collection"
+
 client = TestClient(app)
 
 @pytest.fixture
@@ -53,7 +55,7 @@ def auth_headers():
 # --- STANDARD ROUTES TESTS ---
 
 def test_root_endpoint():
-    response = client.get("/")
+    response = client.get(f"{PREFIX}/")
     assert response.status_code == 200
     assert response.json() == {"message": "Welcome to Notiver's homepage!"}
 
@@ -61,32 +63,32 @@ def test_root_endpoint():
 @patch('app.api.routes.collect_data_url')
 def test_get_collect_data_success(mock_url_generator, mock_boto_client, mock_aws_env):
     mock_url_generator.return_value = "https://fake-aws-url.com/excel.xlsx"
-    response = client.get("/collect-data")
+    response = client.get(f"{PREFIX}/collect-data")
     assert response.status_code == 200
     assert response.json()["url"] == "https://fake-aws-url.com/excel.xlsx"
 
 def test_get_collect_data_not_found(mock_aws_env):
-    response = client.get("/collect-data")
+    response = client.get(f"{PREFIX}/collect-data")
     assert response.status_code == 404
     assert "Error finding file" in response.json()["detail"]
 
 @patch('app.api.routes.execute_full_collection')
 def test_post_articles_success(mock_execute):
     mock_execute.return_value = {"status": "success", "message": "Articles collected."}
-    response = client.post("/upload-articles")
+    response = client.post(f"{PREFIX}/upload-articles")
     assert response.status_code == 200
 
 @patch('app.api.routes.execute_full_collection')
 def test_post_articles_failure(mock_execute):
     mock_execute.return_value = {"status": "error", "message": "Guardian API down."}
-    response = client.post("/upload-articles")
+    response = client.post(f"{PREFIX}/upload-articles")
     assert response.status_code == 500
     assert response.json()["detail"] == "Guardian API down."
 
 @patch('app.api.routes.fetch_collection_status')
 def test_get_articles(mock_fetch):
     mock_fetch.return_value = {"status": "success", "count": 5}
-    response = client.get("/collect-articles")
+    response = client.get(f"{PREFIX}/collect-articles")
     assert response.status_code == 200
     assert response.json()["count"] == 5
 
@@ -98,7 +100,7 @@ def test_post_collect_articles_authenticated(mock_aws_env, auth_headers):
     s3, sqs = mock_aws_env
     payload = {"location": "Sydney", "timeFrame": "1_year", "category": "crime"}
 
-    response = client.post("/collect-articles", json=payload, headers=auth_headers)
+    response = client.post(f"{PREFIX}/collect-articles", json=payload, headers=auth_headers)
 
     # 1. Assert the instant API response
     assert response.status_code == 200
@@ -120,7 +122,7 @@ def test_post_collect_articles_unauthenticated(mock_aws_env):
     s3, sqs = mock_aws_env
     payload = {"location": "Sydney", "timeFrame": "1_year", "category": "crime"}
     
-    response = client.post("/collect-articles", json=payload)
+    response = client.post(f"{PREFIX}/collect-articles", json=payload)
     
     assert response.status_code == 200
     
@@ -135,7 +137,7 @@ def test_get_user_id_decode_exception(mock_aws_env):
     bad_headers = {"Authorization": "Bearer not.real.base64"}
     payload = {"location": "Sydney", "timeFrame": "1_year", "category": "crime"}
     
-    response = client.post("/collect-articles", json=payload, headers=bad_headers)
+    response = client.post(f"{PREFIX}/collect-articles", json=payload, headers=bad_headers)
     assert response.status_code == 200
     
     # Verify it still queued the job, but as guest_user
@@ -149,7 +151,7 @@ def test_post_collect_articles_missing_sqs_url(monkeypatch):
     monkeypatch.setattr(routes, "SQS_QUEUE_URL", None)
     
     payload = {"location": "Sydney", "timeFrame": "1_year", "category": "crime"}
-    response = client.post("/collect-articles", json=payload)
+    response = client.post(f"{PREFIX}/collect-articles", json=payload)
     assert response.status_code == 500
     assert "Server configuration error" in response.json()["detail"]
 
@@ -163,7 +165,7 @@ def test_post_collect_articles_sqs_exception(mock_boto_client, mock_aws_env):
     mock_boto_client.return_value = mock_sqs
     
     payload = {"location": "Sydney", "timeFrame": "1_year", "category": "crime"}
-    response = client.post("/collect-articles", json=payload)
+    response = client.post(f"{PREFIX}/collect-articles", json=payload)
     
     assert response.status_code == 500
     assert "Failed to queue scraping job" in response.json()["detail"]
