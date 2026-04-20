@@ -1,5 +1,3 @@
-import os
-
 from fastapi import FastAPI
 from app.api.routes import router
 from mangum import Mangum
@@ -37,11 +35,12 @@ app.add_middleware(SlowAPIMiddleware)
 app.middleware("http")(observability_middleware)
 
 app.include_router(router)
-stage = os.getenv("STAGE", "staging")
-_mangum_handler = Mangum(app, lifespan="off", api_gateway_base_path=f"/{stage}/data-processing")
+# stage = os.getenv("STAGE", "staging")
+# _mangum_handler = Mangum(app, lifespan="off", api_gateway_base_path=f"/{stage}/data-processing")
 
 @tracer.capture_lambda_handler
 def handler(event, context):
-    stage = os.getenv("STAGE", "staging")
-    _mangum_handler = Mangum(app, lifespan="off", api_gateway_base_path=f"/{stage}/data-processing")
+    request_context = event.get("requestContext", {})
+    stage = request_context.get("stage", "staging")
+    _mangum_handler = Mangum(app, lifespan="off", api_gateway_base_path=f"/{stage}")
     return _mangum_handler(event, context)

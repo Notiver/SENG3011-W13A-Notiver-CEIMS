@@ -14,7 +14,7 @@ from app import config
 from observability.middleware.logging_middleware import log_storage_event, log_spam_event
 from app.services.article_manager import execute_full_collection, fetch_collection_status
 
-router = APIRouter()
+router = APIRouter(prefix="/data-collection")
 SQS_QUEUE_URL = os.getenv("SQS_QUEUE_URL")
 
 def get_user_id(request: Request) -> str:
@@ -36,12 +36,13 @@ class ScrapeRequest(BaseModel):
     timeFrame: str
     category: str
 
-@router.get("/")
+@router.get("/", include_in_schema=False)
 def root():
     return {"message": "Welcome to Notiver's homepage!"}
 
-@router.post("/upload-data")
+@router.post("/upload-data", include_in_schema=False)
 def upload_data(request: Request, my_file: UploadFile = File(...)):
+    # ... (Internal Excel uploading logic)
     caller_ip = request.client.host if request.client else "unknown"
 
     log_storage_event(
@@ -76,7 +77,7 @@ def upload_data(request: Request, my_file: UploadFile = File(...)):
         )
         raise HTTPException(status_code=500, detail=f"Error uploading to S3: {e}")
 
-@router.get("/collect-data")
+@router.get("/collect-data", include_in_schema=False)
 def get_data():
     try:
         file_name = config.EXCEL_BUCKET_NAME + "/" + config.EXCEL_FILE_NAME
@@ -89,7 +90,7 @@ def get_data():
     except Exception as e:
         raise HTTPException(status_code=404, detail=f"Error finding file: {e}")
 
-@router.post("/upload-articles")
+@router.post("/upload-articles", include_in_schema=False)
 def post_articles(request: Request):
     caller_ip = request.client.host if request.client else "unknown"
     log_storage_event(
@@ -114,12 +115,25 @@ def post_articles(request: Request):
     )
     return result
 
-@router.get("/collect-articles")
+@router.get("/collect-articles", include_in_schema=False)
 def get_articles():
     return fetch_collection_status()
 
-@router.post("/collect-articles")
+
+@router.post("/collect-articles", summary="Initialize Intelligence Scraper")
 def post_dynamic_articles(request: ScrapeRequest, fast_request: Request):
+    """
+    Triggers an asynchronous background worker to scrape historical news articles.
+
+    This endpoint places a job ticket into the SQS queue. The cloud worker will search the Guardian news API based on the parameters provided.
+
+    - **category**: The news vector to target (e.g., "stocks", "crime", "geopolitics").
+    - **location**: The target city or keyword (e.g., "Dubai", "New York").
+    - **timeFrame**: How far back to search (e.g., "1_per_month_5_years", "5_per_month_1_year").
+
+    **Returns:**
+    A JSON object containing a `job_id` which must be used to poll the completion status via the `GET` endpoint.
+    """
     user_id = get_user_id(fast_request) 
     job_id = str(uuid.uuid4())
 
@@ -153,8 +167,18 @@ def post_dynamic_articles(request: ScrapeRequest, fast_request: Request):
         print(f"Failed to send to SQS: {e}")
         raise HTTPException(status_code=500, detail="Failed to queue scraping job.")
     
-@router.get("/collect-articles/{job_id}")
+@router.get("/collect-articles/{job_id}", summary="Poll Scraper Job Status")
 def check_job_status(job_id: str, fast_request: Request):
+    """
+    Polls the AWS S3 data lake to check if the background scraping worker has finished gathering the articles.
+
+    **Integration Note:**
+    - If the job is still running, this endpoint returns a `processing` status.
+    - Once complete, it returns a `complete` status along with the array of extracted articles and their real publication dates.
+
+    **Parameters:**
+    - **job_id**: The unique UUID returned from the `POST /collect-articles` endpoint.
+    """
     user_id = get_user_id(fast_request) 
     
     s3_key = f"users/{user_id}/jobs/{job_id}.json"

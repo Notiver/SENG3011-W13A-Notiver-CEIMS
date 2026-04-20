@@ -2,6 +2,8 @@ from unittest.mock import patch
 from utils.crime_classifier import classify_crime 
 from utils.location_classifier import get_location_metadata
 
+PREFIX="/data-processing"
+
 class TestCrimeClassifier:
     def test_classify_crime_single_match(self):
         text = "The suspect was arrested for armed robbery at the local store."
