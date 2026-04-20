@@ -221,8 +221,6 @@ def calculate_housing_score(lga_mean_price):
 
 @tracer.capture_method(capture_response=False)
 def sentiment_housing():
-    all_article_events = []
-
     url = f"{config.API_URL.rstrip('/')}/data-processing/public/housing-articles"
         
     response = requests.get(url, timeout=15)

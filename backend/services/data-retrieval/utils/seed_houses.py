@@ -93,12 +93,12 @@ def process_local_dat_files(directory_path, stage="staging"):
         })
 
     # Upload to AWS DynamoDB in batches of 25 (DynamoDB handles the batching automatically here)
-    print(f"Uploading data to DynamoDB...")
+    print("Uploading data to DynamoDB...")
     with table.batch_writer() as writer:
         for item in final_housing_data:
             writer.put_item(Item=item)
 
-    print("✅ Upload complete! Your database is now populated with real NSW housing data.")
+    print("Upload complete! Your database is now populated with real NSW housing data.")
 
 if __name__ == "__main__":
     # Specify the folder where you saved all your Valuer General .DAT files

@@ -168,6 +168,92 @@ def run_local_housing_nlp():
 
     print("\n🎉 Local Housing NLP Pipeline Complete!")
 
+def run_s3_housing_nlp():
+    print("Running local housing NLP (no DynamoDB)...")
+
+    print("Loading RoBERTa sentiment model (this might take a few seconds)...")
+    sentiment_task = pipeline(
+        "sentiment-analysis", 
+        model="cardiffnlp/twitter-roberta-base-sentiment-latest", 
+        top_k=None
+    )
+
+    lga_map = get_lga_to_suburbs_map()
+    print(f"Found {len(lga_map)} unique LGAs to process.")
+
+    url = "https://content.guardianapis.com/search"
+
+    # ✅ Dictionary instead of list
+    final_results = {}
+
+    for lga, suburbs in lga_map.items():
+        print(f"\n--- Processing LGA: {lga} ---")
+        
+        target_suburbs = suburbs[:5]
+        suburb_query_string = " OR ".join([f'"{sub}"' for sub in target_suburbs])
+        
+        query = f'({suburb_query_string}) AND (housing OR "real estate" OR property OR rent)'
+        
+        params = {
+            "q": query,
+            "section": "australia-news",
+            "page-size": 3,
+            "api-key": GUARDIAN_API_KEY,
+            "order-by": "relevance"
+        }
+        
+        try:
+            response = requests.get(url, params=params, timeout=10)
+            results = response.json().get("response", {}).get("results", [])
+            
+            if not results:
+                print(f"No housing articles found for {target_suburbs}. Skipping.")
+                time.sleep(1)
+                continue
+                
+            lga_sentiments = []
+            
+            for item in results:
+                article_url = item.get('webUrl')
+                try:
+                    article = newspaper.article(article_url)
+                    article.download()
+                    article.parse()
+                    text_content = article.text
+                    
+                    if text_content:
+                        sentiment_results = sentiment_task(text_content[:1500])
+                        scores = {
+                            res['label'].lower(): round(res['score'], 4)
+                            for res in sentiment_results[0]
+                        }
+                        
+                        pos_score = scores.get('positive', 0.5)
+                        lga_sentiments.append(pos_score)
+                        print(f"Scored {pos_score} -> {article_url}")
+                        
+                except Exception as e:
+                    print(f"Failed to scrape article: {e}")
+            
+            # ✅ Save to dictionary
+            if lga_sentiments:
+                avg_sentiment = round(sum(lga_sentiments) / len(lga_sentiments), 2)
+
+                final_results[lga] = avg_sentiment
+
+                print(f"✅ Saved {lga}: {avg_sentiment}")
+                
+        except Exception as e:
+            print(f"Failed to fetch from Guardian for {lga}: {e}")
+            
+        time.sleep(1)
+
+    # ✅ Write JSON file
+    with open("housing_sentiment.json", "w") as f:
+        json.dump(final_results, f, indent=2)
+
+    print("\n🎉 Saved results to housing_sentiment.json!")
+
 if __name__ == "__main__":
     # run_local_housing_nlp()
-    copy_sentiment_to_production()
+    run_s3_housing_nlp()
