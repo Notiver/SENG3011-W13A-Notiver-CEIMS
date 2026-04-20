@@ -6,6 +6,7 @@ from utils.lga_format_dict import LGA_FORMAT_MAP
 from utils.crime_dict import CRIME_CATEGORY_MAP, CRIME_WEIGHTS
 from utils.LGAData import get_lga_population
 from utils.db_manager import get_dynamodb_resource
+from utils.SuburbToLGA import suburb_to_lga
 from decimal import Decimal
 from aws_lambda_powertools import Tracer
 
@@ -206,6 +207,107 @@ def upload_lga_by_year_data(lga_stats_by_year, article_events_by_year, lga_by_ye
     with lga_by_year_table.batch_writer() as writer:
         for item in data:
             writer.put_item(Item=item)
+            
+def calculate_housing_score(lga_mean_price):
+    if lga_mean_price <= 0:
+        return 100.0
+        
+    # Mathematical Logic: 100 * (0.5 ^ (Price / Mean))
+    # This naturally bounds everything between 0 and 100 without hard clamping!
+    ratio = lga_mean_price / 1301100
+    score = 100 * (0.5 ** ratio)
+    
+    return max(1.0, min(100.0, score))
+
+@tracer.capture_method(capture_response=False)
+def sentiment_housing():
+    url = f"{config.API_URL.rstrip('/')}/data-processing/public/housing-articles"
+        
+    response = requests.get(url, timeout=15)
+
+    if response.status_code == 200:
+        data = response.json()
+        
+        if isinstance(data, dict):
+            return data
+        
+        return {}
+    else:
+        raise PipelineError(f"process_articles crashed! URL: {url} | Status: {response.status_code} | Body: {response.text}")
+
+@tracer.capture_method
+def process_housing(dynamodb_resource=None, stage="staging"):
+    """
+    Fetches housing data from Team X's API, falls back to manual data if it fails,
+    aggregates suburbs into LGAs, calculates a statistical score based on NSW averages,
+    and uploads the final metrics to DynamoDB.
+    """
+    if not dynamodb_resource:
+        dynamodb_resource = get_dynamodb_resource()
+        
+    housing_table = dynamodb_resource.Table(f'lga-housing-{stage}')
+    
+    suburbs = [
+        "Manly", "Randwick", "Chatswood", "Newtown", "Castle Hill", 
+        "Blacktown", "Parramatta", "Surry Hills", "Bondi", "Homebush"
+    ]
+    
+    cloudbelly = "https://tvfiek3hzi.execute-api.us-east-1.amazonaws.com/dev/api/v1/analytics/summary"
+    
+    lga_accumulator = defaultdict(lambda: {"prices": [], "sentiments": []})
+    housing_sentiments = sentiment_housing()
+
+    # 1. Fetch data and group by LGA
+    for suburb in suburbs:
+        lga = suburb_to_lga(suburb)
+        
+        if lga == "LGA Not Found":
+            print(f"Skipping {suburb}: Could not map to an LGA.")
+            continue
+            
+        try:
+            # Attempt to hit the actual API to prove integration
+            response = requests.get(
+                cloudbelly, 
+                params={"suburb": suburb, "state": "NSW"}, 
+                timeout=3 
+            )
+            response.raise_for_status()
+            api_data = response.json()
+            
+            price = api_data.get("average")
+            sentiment = housing_sentiments.get(lga, 0)
+            
+        except Exception as e:
+            print(f"Team X API failed for {suburb}: {e}.")
+            continue
+            
+        lga_accumulator[lga]["prices"].append(price)
+        lga_accumulator[lga]["sentiments"].append(sentiment)
+
+    final_housing_data = []
+
+    # 2. Average the grouped data and calculate statistical scores
+    for lga, data in lga_accumulator.items():
+        # Calculate the mean price across all suburbs in this LGA
+        lga_mean_price = sum(data["prices"]) / len(data["prices"])
+        lga_mean_sentiment = sum(data["sentiments"]) / len(data["sentiments"])
+        
+        # Calculate the dynamic statistical score!
+        stat_score = calculate_housing_score(lga_mean_price)
+        
+        final_housing_data.append({
+            "lga": lga,
+            "mean_price": Decimal(str(round(lga_mean_price, 2))),
+            "statistical_score": Decimal(str(round(stat_score, 2))),
+            "sentiment_score": Decimal(str(round(lga_mean_sentiment, 2)))
+        })
+
+    # 3. Upload to DynamoDB
+    with housing_table.batch_writer() as writer:
+        for item in final_housing_data:
+            writer.put_item(Item=item)
+
 
 def count_total_articles(events):
     total_articles = defaultdict(int)

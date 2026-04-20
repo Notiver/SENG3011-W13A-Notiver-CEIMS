@@ -6,7 +6,8 @@ from app.services.retriever import (
     count_total_articles,
     sentiment_scores,
     lga_aggregate,
-    stat_score
+    stat_score, 
+    calculate_housing_score
 )
 
 PREFIX="/data-retrieval"
@@ -89,3 +90,20 @@ class TestRetrieverMathLogic:
         
         # If pop is 0, the code `continue`s, so it shouldn't be in the result
         assert "GhostTown" not in result
+        
+    def test_calculate_housing_score_typical(self):
+        """Tests normal housing score calculation."""
+        score = calculate_housing_score(1301100)  # ratio = 1 → 100 * 0.5^1 = 50
+        assert score == pytest.approx(50.0)
+
+
+    def test_calculate_housing_score_zero_or_negative(self):
+        """Tests edge case where price <= 0 returns max score."""
+        assert calculate_housing_score(0) == 100.0
+        assert calculate_housing_score(-500) == 100.0
+
+
+    def test_calculate_housing_score_bounds(self):
+        """Ensures score is always clamped between 1 and 100."""
+        very_high = calculate_housing_score(999999999)
+        assert 1.0 <= very_high <= 100.0
