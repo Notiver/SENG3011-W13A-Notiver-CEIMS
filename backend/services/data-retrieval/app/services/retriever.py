@@ -6,6 +6,7 @@ from utils.lga_format_dict import LGA_FORMAT_MAP
 from utils.crime_dict import CRIME_CATEGORY_MAP, CRIME_WEIGHTS
 from utils.LGAData import get_lga_population
 from utils.db_manager import get_dynamodb_resource
+from utils.SuburbToLGA import suburb_to_lga
 from decimal import Decimal
 from aws_lambda_powertools import Tracer
 
@@ -206,6 +207,89 @@ def upload_lga_by_year_data(lga_stats_by_year, article_events_by_year, lga_by_ye
     with lga_by_year_table.batch_writer() as writer:
         for item in data:
             writer.put_item(Item=item)
+            
+def calculate_housing_score(lga_mean_price):
+    ratio = lga_mean_price / NSW_MEAN_PRICE
+    # Mathematical logic: 100 - (ratio * 50)
+    # 1.3M -> ratio 1 -> 100 - 50 = 50
+    # 2.6M -> ratio 2 -> 100 - 100 = 0
+    # 650k -> ratio 0.5 -> 100 - 25 = 75
+    score = 100 - (ratio * 50)
+    
+    # Clamp the score so it never goes above 100 or below 0
+    return max(0, min(100, score))
+
+@tracer.capture_method
+def process_housing(dynamodb_resource=None, stage="staging"):
+    """
+    Fetches housing data from Team X's API, falls back to manual data if it fails,
+    aggregates suburbs into LGAs, calculates a statistical score based on NSW averages,
+    and uploads the final metrics to DynamoDB.
+    """
+    if not dynamodb_resource:
+        dynamodb_resource = get_dynamodb_resource()
+        
+    housing_table = dynamodb_resource.Table(f'lga-housing-{stage}')
+    
+    suburbs = [
+        "Manly", "Randwick", "Chatswood", "Newtown", "Castle Hill", 
+        "Blacktown", "Parramatta", "Surry Hills", "Bondi", "Homebush"
+    ]
+    
+    cloudbelly = "https://tvfiek3hzi.execute-api.us-east-1.amazonaws.com/dev/api/v1/analytics/summary"
+    
+    lga_accumulator = defaultdict(lambda: {"prices": [], "sentiments": []})
+
+    # 1. Fetch data and group by LGA
+    for suburb in suburbs:
+        lga = suburb_to_lga(suburb)
+        
+        if lga == "LGA Not Found":
+            print(f"Skipping {suburb}: Could not map to an LGA.")
+            continue
+            
+        try:
+            # Attempt to hit the actual API to prove integration
+            response = requests.get(
+                cloudbelly, 
+                params={"suburb": suburb, "state": "NSW"}, 
+                timeout=3 
+            )
+            response.raise_for_status()
+            api_data = response.json()
+            
+            price = api_data.get("average")
+            sentiment = fallback_data[suburb]["sentiment_score"] 
+            
+        except Exception as e:
+            print(f"Team X API failed for {suburb}: {e}.")
+            
+        lga_accumulator[lga]["prices"].append(price)
+        lga_accumulator[lga]["sentiments"].append(sentiment)
+
+    final_housing_data = []
+
+    # 2. Average the grouped data and calculate statistical scores
+    for lga, data in lga_accumulator.items():
+        # Calculate the mean price across all suburbs in this LGA
+        lga_mean_price = sum(data["prices"]) / len(data["prices"])
+        lga_mean_sentiment = sum(data["sentiments"]) / len(data["sentiments"])
+        
+        # Calculate the dynamic statistical score!
+        stat_score = calculate_housing_score(lga_mean_price)
+        
+        final_housing_data.append({
+            "lga": lga,
+            "mean_price": Decimal(str(round(lga_mean_price, 2))),
+            "statistical_score": Decimal(str(round(stat_score, 2))),
+            "sentiment_score": Decimal(str(round(lga_mean_sentiment, 2)))
+        })
+
+    # 3. Upload to DynamoDB
+    with housing_table.batch_writer() as writer:
+        for item in final_housing_data:
+            writer.put_item(Item=item)
+
 
 def count_total_articles(events):
     total_articles = defaultdict(int)

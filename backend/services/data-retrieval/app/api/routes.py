@@ -1,6 +1,6 @@
 import requests
 from fastapi import APIRouter, HTTPException, Depends
-from app.services.retriever import process_retrieval
+from app.services.retriever import process_retrieval, process_housing
 from utils.db_manager import get_db_environment
 from app import config
 
@@ -16,6 +16,16 @@ def run_retrieval(env=Depends(get_db_environment)):
     try:
         # Pass the injected db into the pipeline
         process_retrieval(dynamodb_resource=env['db'], stage=env['stage'])
+        return {"message": "retrieval pipeline completed"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Pipeline error: {str(e)}")
+    
+@router.post("/run-retrieval-housing", include_in_schema=False)
+def run_retrieval_housing(env=Depends(get_db_environment)):
+    """Internal pipeline trigger to aggregate S3 data into DynamoDB, specifically for housing"""
+    try:
+        # Pass the injected db into the pipeline
+        process_housing(dynamodb_resource=env['db'], stage=env['stage'])
         return {"message": "retrieval pipeline completed"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Pipeline error: {str(e)}")
@@ -92,6 +102,26 @@ def get_lga_yearly(lga: str, env=Depends(get_db_environment)):
     """
     try:
         table_name = f"lga-by-year-{env['stage']}"
+        table = env['db'].Table(table_name)
+        response = table.query(
+            KeyConditionExpression="lga = :lga",
+            ExpressionAttributeValues={":lga": lga}
+        )
+        return response["Items"]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@router.get("/lga/{lga}/housing", summary="Get Housing Aggregate Regional Statistics")
+def get_lga_housing(lga: str, env=Depends(get_db_environment)):
+    """
+    Fetches the overall aggregated housing, sentiment, and risk statistics for a specific Local Government Area (LGA).
+
+    - **lga**: The exact string name of the LGA (e.g., "City of Sydney"). You can fetch valid names from the `/lgas` endpoint.
+    
+    **Returns:** A JSON object containing the unified historical housing score and statistical breakdown for the requested region.
+    """
+    try:
+        table_name = f"lga-housing-{env['stage']}"
         table = env['db'].Table(table_name)
         response = table.query(
             KeyConditionExpression="lga = :lga",

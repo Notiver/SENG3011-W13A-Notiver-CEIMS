@@ -10,5 +10,6 @@ if PARENT_DIR not in sys.path:
 S3_BUCKET_NAME = "nsw-crime-data-bucket"
 REGION = "ap-southeast-2"
 PROFILE_NAME = "notiver"
+NSW_MEAN_PRICE = 1301100
 
 API_URL = "https://hbjyijsell.execute-api.ap-southeast-2.amazonaws.com/staging".rstrip("/")
