@@ -1,7 +1,7 @@
 import { fetchAuthSession } from 'aws-amplify/auth';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
-// const BASE_URL = "http://127.0.0.1:8000";
+//const BASE_URL = "http://127.0.0.1:8002";
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
   try {
@@ -76,4 +76,10 @@ export const api = {
     fetchAPI(`/data-retrieval/lga/${encodeURIComponent(lga)}/yearly`, { method: "GET" }),
 
   getPublicCeimsMap: () => fetchAPI('/data-retrieval/public/ceims-articles', { method: "GET" }),
+
+  getLgaHousing: (lga: string) => 
+    fetchAPI(`/data-retrieval/lga/${encodeURIComponent(lga)}/housing`, { method: "GET" }),
+
+  getAllHousing: () => 
+    fetchAPI("/data-retrieval/housing", { method: "GET" }),
 };
