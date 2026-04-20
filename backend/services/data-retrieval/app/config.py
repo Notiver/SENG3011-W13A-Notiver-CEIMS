@@ -13,3 +13,4 @@ PROFILE_NAME = "notiver"
 NSW_MEAN_PRICE = 1301100
 
 API_URL = "https://hbjyijsell.execute-api.ap-southeast-2.amazonaws.com/staging".rstrip("/")
+DATA_PROCESSING_URL = "https://hbjyijsell.execute-api.ap-southeast-2.amazonaws.com/staging/data-processing"

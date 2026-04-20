@@ -112,7 +112,7 @@ def get_lga_yearly(lga: str, env=Depends(get_db_environment)):
         raise HTTPException(status_code=500, detail=str(e))
     
 @router.get("/lga/{lga}/housing", summary="Get Housing Aggregate Regional Statistics")
-def get_lga_housing(lga: str, env=Depends(get_db_environment)):
+def get_specific_housing(lga: str, env=Depends(get_db_environment)):
     """
     Fetches the overall aggregated housing, sentiment, and risk statistics for a specific Local Government Area (LGA).
 

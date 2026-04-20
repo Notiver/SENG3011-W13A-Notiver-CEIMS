@@ -209,15 +209,33 @@ def upload_lga_by_year_data(lga_stats_by_year, article_events_by_year, lga_by_ye
             writer.put_item(Item=item)
             
 def calculate_housing_score(lga_mean_price):
-    ratio = lga_mean_price / NSW_MEAN_PRICE
-    # Mathematical logic: 100 - (ratio * 50)
-    # 1.3M -> ratio 1 -> 100 - 50 = 50
-    # 2.6M -> ratio 2 -> 100 - 100 = 0
-    # 650k -> ratio 0.5 -> 100 - 25 = 75
-    score = 100 - (ratio * 50)
+    if lga_mean_price <= 0:
+        return 100.0
+        
+    # Mathematical Logic: 100 * (0.5 ^ (Price / Mean))
+    # This naturally bounds everything between 0 and 100 without hard clamping!
+    ratio = lga_mean_price / 1301100
+    score = 100 * (0.5 ** ratio)
     
-    # Clamp the score so it never goes above 100 or below 0
-    return max(0, min(100, score))
+    return max(1.0, min(100.0, score))
+
+@tracer.capture_method(capture_response=False)
+def sentiment_housing():
+    all_article_events = []
+
+    url = f"{config.API_URL.rstrip('/')}/data-processing/public/housing-articles"
+        
+    response = requests.get(url, timeout=15)
+
+    if response.status_code == 200:
+        data = response.json()
+        
+        if isinstance(data, dict):
+            return data
+        
+        return {}
+    else:
+        raise PipelineError(f"process_articles crashed! URL: {url} | Status: {response.status_code} | Body: {response.text}")
 
 @tracer.capture_method
 def process_housing(dynamodb_resource=None, stage="staging"):
@@ -239,6 +257,7 @@ def process_housing(dynamodb_resource=None, stage="staging"):
     cloudbelly = "https://tvfiek3hzi.execute-api.us-east-1.amazonaws.com/dev/api/v1/analytics/summary"
     
     lga_accumulator = defaultdict(lambda: {"prices": [], "sentiments": []})
+    housing_sentiments = sentiment_housing()
 
     # 1. Fetch data and group by LGA
     for suburb in suburbs:
@@ -259,10 +278,11 @@ def process_housing(dynamodb_resource=None, stage="staging"):
             api_data = response.json()
             
             price = api_data.get("average")
-            sentiment = fallback_data[suburb]["sentiment_score"] 
+            sentiment = housing_sentiments.get(lga, 0)
             
         except Exception as e:
             print(f"Team X API failed for {suburb}: {e}.")
+            continue
             
         lga_accumulator[lga]["prices"].append(price)
         lga_accumulator[lga]["sentiments"].append(sentiment)
