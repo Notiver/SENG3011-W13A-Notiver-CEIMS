@@ -130,6 +130,28 @@ def get_lga_housing(lga: str, env=Depends(get_db_environment)):
         return response["Items"]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+@router.get("/housing", summary="Get All Housing Aggregate Regional Statistics")
+def get_lga_housing(env=Depends(get_db_environment)):
+    """
+    Fetches all the aggregated housing, sentiment, and risk statistics for a specific Local Government Area (LGA).
+
+    **Returns:** A JSON object containing the unified historical housing score and statistical breakdown for all NSW lgas.
+    """
+    try:
+        table_name = f"lga-housing-{env['stage']}"
+        table = env['db'].Table(table_name)
+        response = table.scan()
+        
+        items = response.get("Items", [])
+
+        while 'LastEvaluatedKey' in response:
+            response = table.scan(ExclusiveStartKey=response['LastEvaluatedKey'])
+            items.extend(response.get('Items', []))
+            
+        return items
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     run_retrieval()
