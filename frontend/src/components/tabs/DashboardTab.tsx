@@ -37,27 +37,44 @@ export default function DashboardTab({ onNavigate }: DashboardProps) {
       category?: string;
     }
 
+    // Declared early so it's reusable for both feed and leaderboard derivation.
+    const INVALID_LGA = new Set([
+      "", "UNKNOWN", "UKNOWN", "NONE", "N/A", "NULL",
+      "GLOBAL", "GLOBAL LOCATION", "NSW GENERAL",
+    ]);
+    const isValidLga = (raw: unknown): raw is string => {
+      if (typeof raw !== "string") return false;
+      const k = raw.trim().toUpperCase();
+      if (!k) return false;
+      if (INVALID_LGA.has(k)) return false;
+      if (k.includes("UNINCORPORATED")) return false;
+      return true;
+    };
+
     const load = async () => {
       try {
         const pub = await api.getPublicCeimsMap();
         const arr: PubArticle[] = (pub?.articles as PubArticle[]) || [];
 
         const items: FeedItem[] = arr
+          .filter((a) => isValidLga(a.lga))
           .slice(-12)
           .reverse()
           .map((a) => ({
             title: a.title || a.file_key?.split("/").pop()?.replace(".txt", "").replace(/_/g, " ") || "Untitled",
             lga: (a.lga || "—").toString(),
-            publishedAt: a.publish_date || a.metadata?.publish_date || new Date().toISOString(),
+            publishedAt: a.publish_date || a.metadata?.publish_date || "",
             sentiment: Number(a.sentiment_score ?? 0),
             category: a.category,
           }));
         setFeed(items);
 
+        // Any non-geographic / placeholder value is dropped — the leaderboard
+        // should only rank real LGAs, never "Unknown", "Global", or empty.
         const groups: Record<string, { count: number; total: number }> = {};
         for (const a of arr) {
-          if (!a.lga) continue;
-          const key = String(a.lga).toUpperCase();
+          if (!isValidLga(a.lga)) continue;
+          const key = String(a.lga).trim().toUpperCase();
           groups[key] = groups[key] || { count: 0, total: 0 };
           groups[key].count += 1;
           groups[key].total += Number(a.sentiment_score ?? 0);
@@ -211,11 +228,15 @@ export default function DashboardTab({ onNavigate }: DashboardProps) {
                       </div>
                       <div className="text-[11.5px] flex items-center gap-2 mt-0.5" style={{ color: "var(--text-3)" }}>
                         <span className="capitalize">{item.lga.toLowerCase()}</span>
-                        <span aria-hidden="true">·</span>
-                        <span className="inline-flex items-center gap-1">
-                          <Clock size={10} strokeWidth={2} aria-hidden="true" />
-                          {relativeTime(item.publishedAt)}
-                        </span>
+                        {relativeTime(item.publishedAt) && (
+                          <>
+                            <span aria-hidden="true">·</span>
+                            <span className="inline-flex items-center gap-1">
+                              <Clock size={10} strokeWidth={2} aria-hidden="true" />
+                              {relativeTime(item.publishedAt)}
+                            </span>
+                          </>
+                        )}
                       </div>
                     </div>
                     <Chip tone={tone}>

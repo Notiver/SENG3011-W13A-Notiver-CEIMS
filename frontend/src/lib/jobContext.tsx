@@ -87,16 +87,18 @@ export function useJob() {
 
 export function timeframeLabel(tf: string): string {
   switch (tf) {
-    case "1_per_month_5_years": return "5 years · monthly";
-    case "5_per_month_1_year":  return "1 year · 5 / month";
+    case "today":               return "Today";
     case "1_per_day_1_month":   return "1 month · daily";
+    case "5_per_month_1_year":  return "1 year · 5 / month";
+    case "1_per_month_5_years": return "5 years · monthly";
     default: return tf;
   }
 }
 
 export function expectedCount(tf: string): number {
-  if (tf === "1_per_month_5_years") return 60;
-  if (tf === "5_per_month_1_year") return 60;
+  if (tf === "today") return 15;
   if (tf === "1_per_day_1_month") return 30;
+  if (tf === "5_per_month_1_year") return 60;
+  if (tf === "1_per_month_5_years") return 60;
   return 60;
 }

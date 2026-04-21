@@ -24,15 +24,17 @@ interface ArticleRecord {
 }
 
 const PRESETS = [
+  { id: "today-crime-syd",  name: "Today · Sydney crime",  category: "crime",    location: "Sydney, Australia", timeFrame: "today",               mode: "global"  as const },
   { id: "sydney-crime-1y",  name: "Sydney · crime · 1y",   category: "crime",    location: "Sydney, Australia", timeFrame: "5_per_month_1_year",  mode: "global"  as const },
   { id: "nsw-crime-1mo",    name: "NSW · crime · 1mo",     category: "crime",    location: "Sydney, Australia", timeFrame: "1_per_day_1_month",   mode: "ceims"   as const },
   { id: "housing-5y",       name: "Housing · 5 years",     category: "housing",  location: "Sydney, Australia", timeFrame: "1_per_month_5_years", mode: "global"  as const },
 ];
 
 const TIMEFRAMES = [
-  { id: "1_per_month_5_years", label: "5 years",   hint: "1 / month",  density: "Shallow" },
-  { id: "5_per_month_1_year",  label: "1 year",    hint: "5 / month",  density: "Balanced" },
+  { id: "today",               label: "Today",     hint: "latest",     density: "Live" },
   { id: "1_per_day_1_month",   label: "1 month",   hint: "1 / day",    density: "Dense" },
+  { id: "5_per_month_1_year",  label: "1 year",    hint: "5 / month",  density: "Balanced" },
+  { id: "1_per_month_5_years", label: "5 years",   hint: "1 / month",  density: "Shallow" },
 ];
 
 export default function JobStudioTab() {
@@ -459,7 +461,7 @@ export default function JobStudioTab() {
 
           {/* Step 3: Density */}
           <Step num={3} label="Density" last>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {TIMEFRAMES.map((tf) => {
                 const active = timeFrame === tf.id;
                 return (
