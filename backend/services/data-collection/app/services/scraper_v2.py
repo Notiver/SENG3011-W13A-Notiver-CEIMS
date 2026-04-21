@@ -31,7 +31,12 @@ def run_dynamic_scraper(location: str, time_frame: str, category: str, user_id: 
     
     current_date = datetime.now()
     api_queries = []
-    
+
+    # `page_size` is padded above the user-visible target so that losses from
+    # paywalls, failed downloads and the city-mention filter don't leave the
+    # bucket underfilled. The frontend still shows the target in its progress
+    # labels; any extra articles are a pleasant surprise.
+
     if time_frame == "1_per_month_5_years":
         for i in range(60):
             target_month = current_date.month - i
@@ -39,12 +44,12 @@ def run_dynamic_scraper(location: str, time_frame: str, category: str, user_id: 
             while target_month <= 0:
                 target_month += 12
                 target_year -= 1
-            
+
             _, last_day = calendar.monthrange(target_year, target_month)
             api_queries.append({
                 "from_date": f"{target_year}-{target_month:02d}-01",
                 "to_date": f"{target_year}-{target_month:02d}-{last_day:02d}",
-                "page_size": 1
+                "page_size": 2  # target 1, pad 1 for filtering losses
             })
 
     elif time_frame == "5_per_month_1_year":
@@ -54,12 +59,12 @@ def run_dynamic_scraper(location: str, time_frame: str, category: str, user_id: 
             while target_month <= 0:
                 target_month += 12
                 target_year -= 1
-                
+
             _, last_day = calendar.monthrange(target_year, target_month)
             api_queries.append({
                 "from_date": f"{target_year}-{target_month:02d}-01",
                 "to_date": f"{target_year}-{target_month:02d}-{last_day:02d}",
-                "page_size": 5
+                "page_size": 8  # target 5, pad 3 for filtering losses
             })
 
     elif time_frame == "1_per_day_1_month":
@@ -69,13 +74,23 @@ def run_dynamic_scraper(location: str, time_frame: str, category: str, user_id: 
             api_queries.append({
                 "from_date": date_str,
                 "to_date": date_str,
-                "page_size": 1
+                "page_size": 2  # target 1, pad 1 for filtering losses
             })
+
+    elif time_frame == "today":
+        # "Scrape today" button — everything published today for this target.
+        today_str = current_date.strftime("%Y-%m-%d")
+        api_queries.append({
+            "from_date": today_str,
+            "to_date": today_str,
+            "page_size": 15  # up to 15 top results from today
+        })
+
     else:
         api_queries.append({
             "from_date": f"{current_date.year}-01-01",
             "to_date": f"{current_date.year}-12-31",
-            "page_size": 5
+            "page_size": 8
         })
 
     url = "https://content.guardianapis.com/search"
@@ -102,10 +117,12 @@ def run_dynamic_scraper(location: str, time_frame: str, category: str, user_id: 
                 results = response.json().get("response", {}).get("results", [])
                 for item in results:
                     web_url = item.get('webUrl')
-                    # grab the date from the Guardian
-                    pub_date = item.get('webPublicationDate', datetime.now().isoformat())
-                    
-                    if web_url:
+                    # Guardian's webPublicationDate is the authoritative publish
+                    # date — keep it as-is and skip articles without one rather
+                    # than substituting today's date.
+                    pub_date = item.get('webPublicationDate')
+
+                    if web_url and pub_date:
                         article_data[web_url] = pub_date
             else:
                 print(f"API ERROR {response.status_code}: {response.text}")
@@ -130,38 +147,47 @@ def run_dynamic_scraper(location: str, time_frame: str, category: str, user_id: 
             article.download()
             article.parse()
             content = article.text
-            
+
+            # The Guardian search already filters on the city keyword, so we
+            # just need a light sanity check that the body mentions it at
+            # least once. Previously we required >= 3 mentions which was too
+            # aggressive and commonly trimmed 60 target articles to ~6.
             if content:
                 mention_count = content.lower().count(primary_city.lower())
-                
-                if mention_count < 3:
-                    print(f"Skipped (Not relevant enough): Mentioned '{primary_city}' only {mention_count} times.")
+                if mention_count < 1:
+                    print(f"Skipped (no body mention of '{primary_city}'): {article_url}")
                     continue
-            
+
             real_title = article.title if article.title else "News Report"
-            
-            if article.publish_date:
+
+            # Prefer Guardian's webPublicationDate — it's reliable and always
+            # the actual publication date. newspaper3k's publish_date parser
+            # often falls through to today's HTTP response date, which is how
+            # articles were ending up stamped "today" in the UI.
+            if real_publish_date:
+                final_date = real_publish_date
+            elif article.publish_date:
                 final_date = article.publish_date.isoformat()
             else:
-                final_date = real_publish_date
-            
+                final_date = None  # surface "unknown date" honestly
+
             if content:
                 safe_cat = category.replace(" ", "_")
                 s3_key = f"users/{user_id}/{config.NEWS_BUCKET_NAME}/{safe_cat}_{i}.txt"
-                
+
                 s3.put_object(
-                    Bucket=config.S3_BUCKET_NAME, 
-                    Key=s3_key, 
+                    Bucket=config.S3_BUCKET_NAME,
+                    Key=s3_key,
                     Body=content,
                     ContentType='text/plain'
                 )
-                
+
                 scraped_data.append({
                     "file_key": s3_key,
                     "url": article_url,
                     "content": content,
-                    "title": real_title,  
-                    "metadata": {"publish_date": final_date} 
+                    "title": real_title,
+                    "metadata": {"publish_date": final_date}
                 })
         except Exception as e:
             print(f"FAILED ON ARTICLE {article_url}: {e}")
