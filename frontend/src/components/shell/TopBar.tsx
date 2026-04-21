@@ -114,7 +114,7 @@ export default function TopBar({ userLabel, onOpenPalette, title, subtitle }: To
         style={{ background: "var(--surface-1)", border: "1px solid var(--line-2)" }}
       >
         <div
-          className="w-6 h-6 rounded-md grid place-items-center text-[10.5px] font-semibold"
+          className="w-6 h-6 rounded-md grid place-items-center text-[11px] font-semibold"
           style={{
             background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
             color: "white",

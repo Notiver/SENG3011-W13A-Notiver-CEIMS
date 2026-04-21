@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Sparkles, TrendingUp, TrendingDown, ArrowRight, Gauge, Radar, MapPin, Clock, Activity } from "lucide-react";
+import { Sparkles, TrendingUp, TrendingDown, Minus, ArrowRight, Gauge, Radar, MapPin, Clock, Activity } from "lucide-react";
 import { LineChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "@/lib/api";
 import { MOCK_CHART_DATA } from "@/lib/dataLabels";
@@ -163,12 +163,17 @@ export default function DashboardTab({ onNavigate }: DashboardProps) {
               </button>
             }
           />
-          <div className="px-5 pb-5 space-y-1">
+          <div
+            className="px-5 pb-5 space-y-1"
+            aria-busy={feed === null}
+            aria-live="polite"
+          >
             {feed === null && (
               <>
-                <div className="h-12 skeleton" />
-                <div className="h-12 skeleton" />
-                <div className="h-12 skeleton" />
+                <span className="sr-only">Loading live article stream…</span>
+                <div className="h-12 skeleton" aria-hidden="true" />
+                <div className="h-12 skeleton" aria-hidden="true" />
+                <div className="h-12 skeleton" aria-hidden="true" />
               </>
             )}
             {feed && feed.length === 0 && (
@@ -181,14 +186,22 @@ export default function DashboardTab({ onNavigate }: DashboardProps) {
             )}
             {feed && feed.length > 0 && (
               <ul className="divide-y" style={{ borderColor: "var(--line-1)" }}>
-                {feed.slice(0, 8).map((item, i) => (
+                {feed.slice(0, 8).map((item, i) => {
+                  const tone: "danger" | "success" | "neutral" =
+                    item.sentiment < -0.15 ? "danger" :
+                    item.sentiment >  0.15 ? "success" :
+                    "neutral";
+                  const ToneIcon = tone === "danger" ? TrendingDown : tone === "success" ? TrendingUp : Minus;
+                  const toneLabel = tone === "danger" ? "Negative sentiment" : tone === "success" ? "Positive sentiment" : "Neutral sentiment";
+                  return (
                   <li key={i} className="py-2.5 flex items-center gap-3 group">
                     <span
+                      aria-hidden="true"
                       className="w-1 h-8 rounded-full shrink-0"
                       style={{
                         background:
-                          item.sentiment < -0.15 ? "var(--danger)" :
-                          item.sentiment > 0.15 ? "var(--success)" :
+                          tone === "danger"  ? "var(--danger)"  :
+                          tone === "success" ? "var(--success)" :
                           "var(--line-3)",
                       }}
                     />
@@ -198,18 +211,22 @@ export default function DashboardTab({ onNavigate }: DashboardProps) {
                       </div>
                       <div className="text-[11.5px] flex items-center gap-2 mt-0.5" style={{ color: "var(--text-3)" }}>
                         <span className="capitalize">{item.lga.toLowerCase()}</span>
-                        <span>·</span>
+                        <span aria-hidden="true">·</span>
                         <span className="inline-flex items-center gap-1">
-                          <Clock size={10} strokeWidth={2} />
+                          <Clock size={10} strokeWidth={2} aria-hidden="true" />
                           {relativeTime(item.publishedAt)}
                         </span>
                       </div>
                     </div>
-                    <Chip tone={item.sentiment < -0.15 ? "danger" : item.sentiment > 0.15 ? "success" : "neutral"}>
-                      {item.sentiment.toFixed(2)}
+                    <Chip tone={tone}>
+                      <ToneIcon size={10} strokeWidth={2.5} aria-hidden="true" />
+                      <span className="sr-only">{toneLabel}, </span>
+                      <span aria-hidden="true">{item.sentiment.toFixed(2)}</span>
+                      <span className="sr-only">score {item.sentiment.toFixed(2)}</span>
                     </Chip>
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             )}
           </div>
@@ -230,13 +247,14 @@ export default function DashboardTab({ onNavigate }: DashboardProps) {
               </button>
             }
           />
-          <div className="px-5 pb-5">
+          <div className="px-5 pb-5" aria-busy={topLgas === null} aria-live="polite">
             {topLgas === null && (
               <div className="space-y-2">
-                <div className="h-10 skeleton" />
-                <div className="h-10 skeleton" />
-                <div className="h-10 skeleton" />
-                <div className="h-10 skeleton" />
+                <span className="sr-only">Loading leaderboard…</span>
+                <div className="h-10 skeleton" aria-hidden="true" />
+                <div className="h-10 skeleton" aria-hidden="true" />
+                <div className="h-10 skeleton" aria-hidden="true" />
+                <div className="h-10 skeleton" aria-hidden="true" />
               </div>
             )}
             {topLgas && topLgas.length === 0 && (
@@ -263,7 +281,11 @@ export default function DashboardTab({ onNavigate }: DashboardProps) {
                           {row.count}
                         </span>
                       </div>
-                      <div className="h-[3px] rounded-full overflow-hidden" style={{ background: "var(--surface-2)" }}>
+                      <div
+                        aria-hidden="true"
+                        className="h-[3px] rounded-full overflow-hidden"
+                        style={{ background: "var(--surface-2)" }}
+                      >
                         <div
                           className="h-full rounded-full transition-all duration-700"
                           style={{
@@ -391,7 +413,7 @@ function KpiCard({
     >
       <div className="flex items-center justify-between">
         <span
-          className="text-[10.5px] uppercase tracking-[0.16em] font-semibold"
+          className="text-[11px] uppercase tracking-[0.16em] font-semibold"
           style={{ color: "var(--text-3)" }}
         >
           {title}
@@ -447,7 +469,7 @@ function Chip({ tone, children }: { tone: "success" | "danger" | "neutral"; chil
   }[tone];
   return (
     <span
-      className="text-[11px] font-mono tabular-nums px-1.5 py-[1px] rounded"
+      className="inline-flex items-center gap-1 text-[11px] font-mono tabular-nums px-1.5 py-[1px] rounded"
       style={{ background: map.bg, color: map.fg }}
     >
       {children}

@@ -9,6 +9,7 @@ import { api } from "@/lib/api";
 import { MAJOR_CITIES } from "@/lib/majorCities";
 import { CEIMS_CATEGORIES, INTEROP_CATEGORIES } from "@/lib/dataLabels";
 import { useJob, expectedCount } from "@/lib/jobContext";
+import { useFocusTrap } from "@/lib/useFocusTrap";
 import { cn } from "@/lib/cn";
 
 type Stage = "scrape" | "nlp" | "enrich" | "publish";
@@ -367,7 +368,7 @@ export default function JobStudioTab() {
               </p>
             </div>
             <span
-              className="text-[10.5px] font-mono px-2 py-1 rounded-md"
+              className="text-[11px] font-mono px-2 py-1 rounded-md"
               style={{ background: "var(--surface-2)", color: "var(--text-3)" }}
             >
               3 steps
@@ -477,7 +478,7 @@ export default function JobStudioTab() {
                     }}
                   >
                     <div className="text-[12.5px] font-semibold">{tf.label}</div>
-                    <div className="text-[10.5px] mt-0.5" style={{ color: "var(--text-3)" }}>
+                    <div className="text-[11px] mt-0.5" style={{ color: "var(--text-3)" }}>
                       {tf.hint}
                     </div>
                     <div
@@ -702,12 +703,13 @@ export default function JobStudioTab() {
 
               {/* Skeleton while waiting */}
               {(loading || isPolling) && articles.length === 0 && !isFallback && (
-                <>
-                  <div className="h-14 skeleton" />
-                  <div className="h-14 skeleton" />
-                  <div className="h-14 skeleton" />
-                  <div className="h-14 skeleton" />
-                </>
+                <div aria-busy="true" aria-live="polite" className="space-y-1.5">
+                  <span className="sr-only">Scraping in progress, articles will appear here…</span>
+                  <div className="h-14 skeleton" aria-hidden="true" />
+                  <div className="h-14 skeleton" aria-hidden="true" />
+                  <div className="h-14 skeleton" aria-hidden="true" />
+                  <div className="h-14 skeleton" aria-hidden="true" />
+                </div>
               )}
 
               {/* Fallback URLs */}
@@ -761,7 +763,7 @@ export default function JobStudioTab() {
                             {preview}
                           </div>
                         )}
-                        <div className="text-[10.5px] mt-1 inline-flex items-center gap-1.5" style={{ color: "var(--text-4)" }}>
+                        <div className="text-[11px] mt-1 inline-flex items-center gap-1.5" style={{ color: "var(--text-4)" }}>
                           <Clock size={10} strokeWidth={2} /> {publishDate} · S3 extractor
                         </div>
                       </div>
@@ -778,45 +780,94 @@ export default function JobStudioTab() {
 
       {/* Inspector modal */}
       {selectedArticle && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-150"
-          style={{ background: "var(--overlay)", backdropFilter: "blur(8px)" }}
-          onClick={() => setSelectedArticle(null)}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="rounded-[14px] w-full max-w-[760px] max-h-[80vh] flex flex-col animate-in zoom-in-95 duration-150"
-            style={{
-              background: "var(--surface-1)",
-              border: "1px solid var(--line-2)",
-              boxShadow: "var(--shadow-3)",
-            }}
-          >
-            <div className="flex items-center justify-between px-5 py-3 border-b" style={{ borderColor: "var(--line-1)" }}>
-              <div className="min-w-0">
-                <div className="text-[10.5px] uppercase tracking-[0.14em] font-semibold" style={{ color: "var(--text-3)" }}>
-                  Article
-                </div>
-                <h3 className="text-[15px] font-semibold truncate capitalize" style={{ color: "var(--text-0)" }}>
-                  {selectedArticle.file_key?.split("/").pop()?.replace(".txt", "").replace(/_/g, " ") || "Viewer"}
-                </h3>
-              </div>
-              <button
-                onClick={() => setSelectedArticle(null)}
-                className="w-8 h-8 rounded-lg grid place-items-center hover:bg-[var(--surface-2)]"
-              >
-                <X size={16} strokeWidth={2} style={{ color: "var(--text-2)" }} />
-              </button>
-            </div>
-            <div
-              className="overflow-y-auto custom-scrollbar p-5 text-[13.5px] leading-[1.65] whitespace-pre-wrap"
-              style={{ color: "var(--text-1)" }}
-            >
-              {selectedArticle.content || "No content available."}
-            </div>
-          </div>
-        </div>
+        <ArticleModal
+          article={selectedArticle}
+          onClose={() => setSelectedArticle(null)}
+        />
       )}
+    </div>
+  );
+}
+
+/* ---------------------------- Article modal ---------------------------- */
+
+function ArticleModal({
+  article,
+  onClose,
+}: {
+  article: ArticleRecord;
+  onClose: () => void;
+}) {
+  const dialogRef = useFocusTrap<HTMLDivElement>(true);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const title =
+    article.file_key?.split("/").pop()?.replace(".txt", "").replace(/_/g, " ") ||
+    "Viewer";
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-150"
+      style={{ background: "var(--overlay)", backdropFilter: "blur(8px)" }}
+      onClick={onClose}
+    >
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="article-modal-title"
+        onClick={(e) => e.stopPropagation()}
+        className="rounded-[14px] w-full max-w-[760px] max-h-[80vh] flex flex-col animate-in zoom-in-95 duration-150"
+        style={{
+          background: "var(--surface-1)",
+          border: "1px solid var(--line-2)",
+          boxShadow: "var(--shadow-3)",
+        }}
+      >
+        <div
+          className="flex items-center justify-between px-5 py-3 border-b"
+          style={{ borderColor: "var(--line-1)" }}
+        >
+          <div className="min-w-0">
+            <div
+              className="text-[11px] uppercase tracking-[0.14em] font-semibold"
+              style={{ color: "var(--text-3)" }}
+            >
+              Article
+            </div>
+            <h3
+              id="article-modal-title"
+              className="text-[15px] font-semibold truncate capitalize"
+              style={{ color: "var(--text-0)" }}
+            >
+              {title}
+            </h3>
+          </div>
+          <button
+            onClick={onClose}
+            aria-label="Close article"
+            className="w-9 h-9 rounded-lg grid place-items-center hover:bg-[var(--surface-2)]"
+          >
+            <X size={16} strokeWidth={2} style={{ color: "var(--text-2)" }} aria-hidden="true" />
+          </button>
+        </div>
+        <div
+          className="overflow-y-auto custom-scrollbar p-5 text-[13.5px] leading-[1.65] whitespace-pre-wrap"
+          style={{ color: "var(--text-1)" }}
+        >
+          {article.content || "No content available."}
+        </div>
+      </div>
     </div>
   );
 }
@@ -829,7 +880,7 @@ function Step({
   return (
     <div className={cn("relative pl-8", !last && "pb-6")}>
       <div
-        className="absolute left-0 top-0 w-[22px] h-[22px] rounded-full grid place-items-center text-[10.5px] font-mono"
+        className="absolute left-0 top-0 w-[22px] h-[22px] rounded-full grid place-items-center text-[11px] font-mono"
         style={{
           background: "var(--surface-2)",
           color: "var(--text-2)",
@@ -934,7 +985,7 @@ function CategoryChip({
       }}
     >
       <div className="text-[12.5px] font-semibold">{label}</div>
-      <div className="text-[10.5px] mt-0.5 line-clamp-2" style={{ color: "var(--text-3)" }}>
+      <div className="text-[11px] mt-0.5 line-clamp-2" style={{ color: "var(--text-3)" }}>
         {hint}
       </div>
     </button>
@@ -981,7 +1032,15 @@ function StageRow({
           {hint}
         </div>
         {state === "running" && progress !== undefined && (
-          <div className="mt-2 h-[3px] rounded-full overflow-hidden" style={{ background: "var(--surface-2)" }}>
+          <div
+            role="progressbar"
+            aria-label={`${label} progress`}
+            aria-valuenow={Math.round(progress)}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            className="mt-2 h-[3px] rounded-full overflow-hidden"
+            style={{ background: "var(--surface-2)" }}
+          >
             <div
               className="h-full rounded-full transition-all duration-700"
               style={{ width: `${progress}%`, background: "var(--accent)" }}

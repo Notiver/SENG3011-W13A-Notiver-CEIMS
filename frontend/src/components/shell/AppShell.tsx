@@ -67,6 +67,7 @@ export default function AppShell({
 
   return (
     <JobProvider>
+      <a href="#main" className="skip-link">Skip to main content</a>
       <div
         className="h-screen w-screen flex flex-col overflow-hidden"
         style={{ background: "var(--surface-0)", color: "var(--text-1)" }}
@@ -80,7 +81,11 @@ export default function AppShell({
               title={title}
               subtitle={subtitle}
             />
-            <main className="notiver-canvas flex-1 overflow-y-auto custom-scrollbar">
+            <main
+              id="main"
+              tabIndex={-1}
+              className="notiver-canvas flex-1 overflow-y-auto custom-scrollbar"
+            >
               {children}
             </main>
           </div>

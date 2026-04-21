@@ -60,16 +60,36 @@ export default function StatusBar() {
         background: "var(--surface-0)",
         color: "var(--text-3)",
       }}
+      aria-label="Job status"
     >
-      <div className="flex items-center gap-1.5 font-medium" style={{ color: "var(--text-2)" }}>
+      {/* Announce stage + article count changes politely to screen readers */}
+      <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="flex items-center gap-1.5 font-medium"
+        style={{ color: "var(--text-2)" }}
+      >
         {stageIcon}
         <span>{stageLabel[job.stage]}</span>
+        {job.stage === "scraping" && (
+          <span className="sr-only">
+            , {Math.round(job.scrapeProgress)} percent complete,
+            {" "}{job.articlesCount} of {job.targetCount} articles
+          </span>
+        )}
+        {job.stage === "processing" && (
+          <span className="sr-only">
+            , NLP inference {Math.round(job.nlpProgress)} percent complete
+          </span>
+        )}
       </div>
 
       {job.id && (
         <>
-          <span style={{ color: "var(--text-4)" }}>•</span>
+          <span aria-hidden="true" style={{ color: "var(--text-4)" }}>•</span>
           <span className="font-mono tabular-nums tracking-tight">
+            <span className="sr-only">Job id </span>
             #{job.id.substring(0, 8).toUpperCase()}
           </span>
         </>
@@ -77,9 +97,10 @@ export default function StatusBar() {
 
       {(job.stage === "scraping" || job.stage === "ready") && (
         <>
-          <span style={{ color: "var(--text-4)" }}>•</span>
+          <span aria-hidden="true" style={{ color: "var(--text-4)" }}>•</span>
           <span className="tabular-nums">
-            {job.articlesCount}/{job.targetCount} articles
+            {job.articlesCount}/{job.targetCount} <span className="sr-only">articles captured</span>
+            <span aria-hidden="true">articles</span>
           </span>
         </>
       )}
@@ -87,8 +108,15 @@ export default function StatusBar() {
       <div className="flex-1" />
 
       {(job.stage === "scraping" || job.stage === "processing") && (
-        <div className="w-[140px] h-[3px] rounded-full overflow-hidden"
-          style={{ background: "var(--surface-2)" }}>
+        <div
+          role="progressbar"
+          aria-label={job.stage === "scraping" ? "Scraping progress" : "NLP inference progress"}
+          aria-valuenow={Math.round(pct)}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          className="w-[140px] h-[3px] rounded-full overflow-hidden"
+          style={{ background: "var(--surface-2)" }}
+        >
           <div
             className={cn("h-full rounded-full transition-all duration-700")}
             style={{
@@ -100,8 +128,8 @@ export default function StatusBar() {
       )}
 
       <div className="flex items-center gap-1 tabular-nums">
-        <Clock size={11} strokeWidth={2} />
-        <span>{elapsed}</span>
+        <Clock size={11} strokeWidth={2} aria-hidden="true" />
+        <span><span className="sr-only">Elapsed </span>{elapsed}</span>
       </div>
     </footer>
   );

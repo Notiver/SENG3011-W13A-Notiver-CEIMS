@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { signIn } from "aws-amplify/auth";
-import { AlertCircle, ArrowRight, Loader2 } from "lucide-react";
+import { AlertCircle, ArrowRight, Eye, EyeOff, Loader2 } from "lucide-react";
 
 interface LoginFormProps {
   onLogin: () => void;
@@ -11,6 +11,7 @@ interface LoginFormProps {
 export default function LoginForm({ onLogin }: LoginFormProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -63,7 +64,7 @@ export default function LoginForm({ onLogin }: LoginFormProps) {
             <div className="text-[15px] font-semibold" style={{ color: "var(--text-0)", letterSpacing: "-0.01em" }}>
               Notiver
             </div>
-            <div className="text-[10.5px] uppercase tracking-[0.16em]" style={{ color: "var(--text-3)" }}>
+            <div className="text-[11px] uppercase tracking-[0.16em]" style={{ color: "var(--text-3)" }}>
               Cross-event intelligence
             </div>
           </div>
@@ -102,18 +103,31 @@ export default function LoginForm({ onLogin }: LoginFormProps) {
             <span className="block text-[11px] font-semibold uppercase tracking-[0.14em] mb-1.5" style={{ color: "var(--text-3)" }}>
               Password
             </span>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="w-full h-10 px-3 rounded-[10px] text-[13.5px] outline-none transition-colors"
-              style={{
-                background: "var(--surface-2)",
-                color: "var(--text-0)",
-                border: "1px solid var(--line-2)",
-              }}
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full h-10 pl-3 pr-11 rounded-[10px] text-[13.5px] outline-none transition-colors"
+                style={{
+                  background: "var(--surface-2)",
+                  color: "var(--text-0)",
+                  border: "1px solid var(--line-2)",
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                aria-pressed={showPassword}
+                className="absolute right-1 top-1/2 -translate-y-1/2 w-8 h-8 rounded-md grid place-items-center transition-colors hover:bg-[var(--line-1)]"
+              >
+                {showPassword
+                  ? <EyeOff size={14} strokeWidth={2} style={{ color: "var(--text-2)" }} aria-hidden="true" />
+                  : <Eye    size={14} strokeWidth={2} style={{ color: "var(--text-2)" }} aria-hidden="true" />}
+              </button>
+            </div>
           </label>
 
           {error && (

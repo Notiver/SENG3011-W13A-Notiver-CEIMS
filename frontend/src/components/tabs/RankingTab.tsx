@@ -241,7 +241,7 @@ export default function RankingTab() {
 
         <table className="w-full text-left">
           <thead
-            className="text-[10.5px] uppercase tracking-[0.14em] font-semibold"
+            className="text-[11px] uppercase tracking-[0.14em] font-semibold"
             style={{
               background: "var(--surface-1)",
               color: "var(--text-4)",
@@ -255,11 +255,11 @@ export default function RankingTab() {
               <th className="px-4 py-2.5 font-semibold w-[40px]"></th>
             </tr>
           </thead>
-          <tbody>
+          <tbody aria-busy={filtered === null} aria-live="polite">
             {filtered === null && (
               <>
                 {Array.from({ length: 6 }).map((_, i) => (
-                  <tr key={i} style={{ boxShadow: "inset 0 -1px 0 var(--line-1)" }}>
+                  <tr key={i} style={{ boxShadow: "inset 0 -1px 0 var(--line-1)" }} aria-hidden="true">
                     <td className="px-4 py-3"><div className="skeleton h-4 w-5" /></td>
                     <td className="px-4 py-3"><div className="skeleton h-4 w-36" /></td>
                     <td className="px-4 py-3"><div className="skeleton h-4 w-full max-w-[220px]" /></td>
@@ -296,7 +296,12 @@ export default function RankingTab() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3 max-w-[260px]">
-                      <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: "var(--surface-2)" }}>
+                      {/* Decorative bar — the numeric score is read via the span below */}
+                      <div
+                        aria-hidden="true"
+                        className="flex-1 h-1.5 rounded-full overflow-hidden"
+                        style={{ background: "var(--surface-2)" }}
+                      >
                         <div
                           className="h-full rounded-full transition-[width] duration-700"
                           style={{ width: `${row.score}%`, background: color }}
@@ -305,6 +310,7 @@ export default function RankingTab() {
                       <span
                         className="text-[12px] font-mono tabular-nums w-7 text-right"
                         style={{ color }}
+                        aria-label={`Score ${row.score} out of 100`}
                       >
                         {row.score}
                       </span>
@@ -337,7 +343,7 @@ function TrendBadge({ trend }: { trend: "up" | "down" | "stable" }) {
   const { Icon, label, bg, fg } = map;
   return (
     <span
-      className="inline-flex items-center gap-1 h-6 px-2 rounded-full text-[10.5px] font-semibold uppercase tracking-[0.08em]"
+      className="inline-flex items-center gap-1 h-6 px-2 rounded-full text-[11px] font-semibold uppercase tracking-[0.08em]"
       style={{ background: bg, color: fg }}
     >
       <Icon size={10} strokeWidth={2.5} /> {label}
@@ -378,15 +384,16 @@ function MoversCard({
             {title}
           </h3>
         </div>
-        <span className="text-[10.5px] uppercase tracking-[0.14em] font-semibold" style={{ color: "var(--text-4)" }}>
+        <span className="text-[11px] uppercase tracking-[0.14em] font-semibold" style={{ color: "var(--text-4)" }}>
           7d
         </span>
       </div>
       {data === null ? (
-        <div className="space-y-2">
-          <div className="h-8 skeleton" />
-          <div className="h-8 skeleton" />
-          <div className="h-8 skeleton" />
+        <div className="space-y-2" aria-busy="true" aria-live="polite">
+          <span className="sr-only">Loading movers…</span>
+          <div className="h-8 skeleton" aria-hidden="true" />
+          <div className="h-8 skeleton" aria-hidden="true" />
+          <div className="h-8 skeleton" aria-hidden="true" />
         </div>
       ) : items.length === 0 ? (
         <div className="text-[12px] py-4 text-center" style={{ color: "var(--text-3)" }}>

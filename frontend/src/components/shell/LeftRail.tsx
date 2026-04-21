@@ -55,6 +55,7 @@ export default function LeftRail({ active, onChange, onLogout }: LeftRailProps) 
                 key={key}
                 onClick={() => onChange(key)}
                 aria-label={label}
+                aria-current={isActive ? "page" : undefined}
                 className={cn(
                   "group relative w-9 h-9 rounded-[10px] grid place-items-center transition-all",
                   "hover:bg-[var(--surface-2)]",

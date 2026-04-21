@@ -18,12 +18,12 @@
   --line-2: #23262f;
   --line-3: #2d313c;
 
-  /* Text */
-  --text-0: #f5f6f8;
-  --text-1: #d7d9e0;
-  --text-2: #9ea1ad;
-  --text-3: #686c78;
-  --text-4: #494d58;
+  /* Text — tuned for WCAG AA on --surface-0 (#0b0c10). */
+  --text-0: #f5f6f8;   /* 19:1 — body / headings                  */
+  --text-1: #d7d9e0;   /* 14:1 — body                              */
+  --text-2: #b0b4be;   /* ~8.5:1 — secondary body                  */
+  --text-3: #8a8e9a;   /* ~6:1  — hints, timestamps (AA normal)    */
+  --text-4: #6b6f7c;   /* ~3.6:1 — decorative / large-text only    */
 
   /* Brand */
   --accent:       #6366f1;   /* indigo-500 */
@@ -124,6 +124,40 @@ kbd {
 
 /* Hairline helper for components that want a 1px inner ring */
 .hairline { box-shadow: inset 0 0 0 1px var(--line-1); }
+
+/* Accessibility: respect user preference for reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .skeleton { animation: none !important; }
+}
+
+/* Skip-to-content link — visible on focus only */
+.skip-link {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 10000;
+  padding: 8px 14px;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  transform: translateY(-200%);
+  transition: transform 0.15s ease;
+}
+.skip-link:focus-visible {
+  transform: translateY(0);
+  outline: none;
+  box-shadow: 0 0 0 2px var(--surface-0), 0 0 0 4px var(--accent-ring);
+}
 
 /* Leaflet popup restyle to match dark surfaces */
 .leaflet-popup-content-wrapper,

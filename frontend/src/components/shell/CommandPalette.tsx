@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import type { NavKey } from "./LeftRail";
 import { cn } from "@/lib/cn";
+import { useFocusTrap } from "@/lib/useFocusTrap";
 
 interface Action {
   id: string;
@@ -38,6 +39,7 @@ function PaletteInner({ onClose, onNavigate, onLogout }: CommandPaletteProps) {
   const [query, setQuery] = useState("");
   const [cursor, setCursor] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const dialogRef = useFocusTrap<HTMLDivElement>(true);
 
   const actions: Action[] = useMemo(
     () => [
@@ -97,6 +99,10 @@ function PaletteInner({ onClose, onNavigate, onLogout }: CommandPaletteProps) {
       onClick={onClose}
     >
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="command-palette-title"
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-[560px] rounded-[14px] overflow-hidden animate-in zoom-in-95 duration-150"
         style={{
@@ -105,27 +111,30 @@ function PaletteInner({ onClose, onNavigate, onLogout }: CommandPaletteProps) {
           boxShadow: "var(--shadow-3)",
         }}
       >
+        <h2 id="command-palette-title" className="sr-only">Command palette</h2>
         <div
           className="flex items-center gap-3 px-4 h-[48px] border-b"
           style={{ borderColor: "var(--line-1)" }}
         >
-          <Search size={15} strokeWidth={2} style={{ color: "var(--text-3)" }} />
+          <Search size={15} strokeWidth={2} style={{ color: "var(--text-3)" }} aria-hidden="true" />
           <input
             ref={inputRef}
             value={query}
             onChange={(e) => { setQuery(e.target.value); setCursor(0); }}
             placeholder="Type a command or search…"
+            aria-label="Search commands"
+            aria-controls="command-palette-list"
             className="flex-1 bg-transparent outline-none text-[14px]"
             style={{ color: "var(--text-0)" }}
           />
           <kbd>ESC</kbd>
         </div>
 
-        <div className="max-h-[360px] overflow-y-auto custom-scrollbar py-2">
+        <div id="command-palette-list" role="listbox" className="max-h-[360px] overflow-y-auto custom-scrollbar py-2">
           {Object.entries(grouped).map(([section, items]) => (
             <div key={section} className="py-1">
               <div
-                className="px-4 py-1.5 text-[10.5px] font-semibold uppercase tracking-[0.14em]"
+                className="px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em]"
                 style={{ color: "var(--text-4)" }}
               >
                 {section}
@@ -167,7 +176,7 @@ function PaletteInner({ onClose, onNavigate, onLogout }: CommandPaletteProps) {
         </div>
 
         <div
-          className="flex items-center gap-4 px-4 h-[34px] border-t text-[10.5px]"
+          className="flex items-center gap-4 px-4 h-[34px] border-t text-[11px]"
           style={{ borderColor: "var(--line-1)", color: "var(--text-3)" }}
         >
           <div className="flex items-center gap-1.5">
