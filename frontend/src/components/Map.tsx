@@ -1,41 +1,46 @@
 "use client";
 
 import { MapContainer, TileLayer, GeoJSON } from "react-leaflet";
+import type { Feature, FeatureCollection } from "geojson";
+import type { Layer, LeafletMouseEvent, Path } from "leaflet";
 import "leaflet/dist/leaflet.css";
-import L from "leaflet";
+
+type LgaProperties = {
+  NSW_LGA__3?: string;
+  NSW_LGA__2?: string;
+  liveScore?: number;
+  liveCrimes?: number;
+};
 
 interface MapProps {
-  geoJsonData: any;
+  geoJsonData: FeatureCollection;
 }
 
-const HIGH_RISK = ["SYDNEY", "BLACKTOWN", "PENRITH", "LIVERPOOL", "MOREE PLAINS", "WALGETT"];
+const HIGH_RISK   = ["SYDNEY", "BLACKTOWN", "PENRITH", "LIVERPOOL", "MOREE PLAINS", "WALGETT"];
 const MEDIUM_RISK = ["PARRAMATTA", "CUMBERLAND", "NEWCASTLE", "CENTRAL COAST", "RANDWICK"];
-const LOW_RISK = ["CANADA BAY", "GEORGES RIVER", "WILLOUGHBY", "RYDE", "KU-RING-GAI"];
+const LOW_RISK    = ["CANADA BAY", "GEORGES RIVER", "WILLOUGHBY", "RYDE", "KU-RING-GAI"];
 
-const getThreatColor = (name: string) => {
-  const upperName = name.toUpperCase();
-  if (HIGH_RISK.includes(upperName)) return "#ef4444"; // Red
-  if (MEDIUM_RISK.includes(upperName)) return "#f97316"; // Orange
-  if (LOW_RISK.includes(upperName)) return "#22c55e"; // Green
-  return "#4f46e5"; // Indigo (Standard)
+const COLOR = {
+  danger:  "#fb7185",
+  warn:    "#fbbf24",
+  success: "#34d399",
+  accent:  "#6366f1",
 };
 
-const getThreatOpacity = (name: string) => {
-  const upperName = name.toUpperCase();
-  if (HIGH_RISK.includes(upperName)) return 0.5;
-  if (MEDIUM_RISK.includes(upperName)) return 0.4;
-  if (LOW_RISK.includes(upperName)) return 0.3;
-  return 0.1;
+const tierFor = (name: string) => {
+  const n = name.toUpperCase();
+  if (HIGH_RISK.includes(n))   return { label: "High risk",     color: COLOR.danger,  fillOpacity: 0.42, minC: 0.75, maxC: 0.99, minN: 0.70, maxN: 0.95 };
+  if (MEDIUM_RISK.includes(n)) return { label: "Elevated",      color: COLOR.warn,    fillOpacity: 0.35, minC: 0.35, maxC: 0.65, minN: 0.35, maxN: 0.65 };
+  if (LOW_RISK.includes(n))    return { label: "Low risk",      color: COLOR.success, fillOpacity: 0.28, minC: 0.00, maxC: 0.20, minN: 0.00, maxN: 0.20 };
+  return                          { label: "Standard",         color: COLOR.accent,  fillOpacity: 0.14, minC: 0.1,  maxC: 0.3,  minN: 0.1,  maxN: 0.3  };
 };
 
-const getScore = (lgaName: string, salt: string, min: number, max: number) => {
-  const seedStr = lgaName + salt;
-  let hash = 0;
-  for (let i = 0; i < seedStr.length; i++) {
-    hash = seedStr.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  const normalized = Math.abs(Math.sin(hash)); 
-  return (min + normalized * (max - min)).toFixed(2);
+const seedScore = (name: string, salt: string, min: number, max: number) => {
+  const s = name + salt;
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = s.charCodeAt(i) + ((h << 5) - h);
+  const norm = Math.abs(Math.sin(h));
+  return (min + norm * (max - min)).toFixed(2);
 };
 
 export default function Map({ geoJsonData }: MapProps) {
@@ -44,12 +49,17 @@ export default function Map({ geoJsonData }: MapProps) {
       <MapContainer
         center={[-33.8688, 151.2093]}
         zoom={10}
-        className="h-full w-full outline-none bg-zinc-950"
+        className="h-full w-full outline-none"
+        style={{ background: "var(--surface-0)" }}
         zoomControl={false}
       >
         <TileLayer
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          url="https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png"
           attribution='&copy; <a href="https://carto.com/">CARTO</a>'
+        />
+        <TileLayer
+          url="https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png"
+          attribution=""
         />
 
         {geoJsonData && (
@@ -57,107 +67,60 @@ export default function Map({ geoJsonData }: MapProps) {
             key={geoJsonData.features?.length || "loading"}
             data={geoJsonData}
             style={(feature) => {
-              const name = feature?.properties?.NSW_LGA__3 || "";
-              
+              const props = feature?.properties as LgaProperties | undefined;
+              const name = props?.NSW_LGA__3 || "";
+              const tier = tierFor(name);
               return {
-                color: "#818cf8",
-                weight: 1.5,
-                fillColor: getThreatColor(name),
-                fillOpacity: getThreatOpacity(name),
+                color: "#353846",
+                weight: 1,
+                fillColor: tier.color,
+                fillOpacity: tier.fillOpacity,
               };
             }}
-            onEachFeature={(feature: any, layer: any) => {
-              const name = feature.properties?.NSW_LGA__3 || "Unknown District";
-              const council = feature.properties?.NSW_LGA__2 || "N/A";
-              const upperName = name.toUpperCase();
+            onEachFeature={(feature: Feature, layer: Layer) => {
+              const props = feature.properties as LgaProperties | undefined;
+              const name = props?.NSW_LGA__3 || "Unknown";
+              const council = props?.NSW_LGA__2 || "N/A";
+              const tier = tierFor(name);
 
-              // Setup dynamic bounds for our data generation based on the risk tier
-              let riskLabel = "STANDARD";
-              let badgeColor = "#4f46e5";
-              let minCrime = 0.1, maxCrime = 0.3;
-              let minNews = 0.1, maxNews = 0.3;
-
-              if (HIGH_RISK.includes(upperName)) {
-                riskLabel = "HIGH RISK";
-                badgeColor = "#ef4444";
-                minCrime = 0.75; maxCrime = 0.99;
-                minNews = 0.70; maxNews = 0.95;
-              } else if (MEDIUM_RISK.includes(upperName)) {
-                riskLabel = "ELEVATED RISK";
-                badgeColor = "#f97316";
-                minCrime = 0.35; maxCrime = 0.65;
-                minNews = 0.35; maxNews = 0.65;
-              } else if (LOW_RISK.includes(upperName)) {
-                riskLabel = "LOW RISK";
-                badgeColor = "#22c55e";
-                minCrime = 0.00; maxCrime = 0.20;
-                minNews = 0.00; maxNews = 0.20; 
-              }
-
-              const crimeScore = getScore(upperName, "_CRIME", minCrime, maxCrime);
-              const newsSentiment = getScore(upperName, "_NEWS", minNews, maxNews);
+              const crimeScore = seedScore(name, "_CRIME", tier.minC, tier.maxC);
+              const newsSentiment = seedScore(name, "_NEWS", tier.minN, tier.maxN);
 
               layer.bindPopup(`
-                <div style="color: #18181b; font-family: sans-serif; min-width: 180px;">
-                  <strong style="display: block; color: ${badgeColor}; font-size: 10px; text-transform: uppercase; margin-bottom: 2px;">
-                    ${riskLabel} ZONE
-                  </strong>
-                  <div style="font-size: 16px; font-weight: bold; margin-bottom: 2px; text-transform: capitalize;">
+                <div style="font-family: var(--font-geist-sans), system-ui; min-width: 200px;">
+                  <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
+                    <span style="width:6px; height:6px; border-radius:2px; background:${tier.color};"></span>
+                    <span style="color:${tier.color}; font-size:10px; letter-spacing:.14em; text-transform:uppercase; font-weight:600;">
+                      ${tier.label}
+                    </span>
+                  </div>
+                  <div style="font-size:14px; font-weight:600; text-transform:capitalize; color:#f5f6f8;">
                     ${name.toLowerCase()}
                   </div>
-                  <div style="font-size: 11px; color: #71717a; margin-bottom: 8px;">
+                  <div style="font-size:11px; color:#9ea1ad; margin-bottom:10px;">
                     ${council}
                   </div>
-                  
-                  <div style="border-top: 1px solid #e4e4e7; padding-top: 8px; font-family: monospace; font-size: 11px;">
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-                      <span style="color: #52525b;">Crime Severity:</span>
-                      <strong style="color: ${badgeColor};">${crimeScore}</strong>
+                  <div style="border-top:1px solid #23262f; padding-top:8px; font-family: var(--font-geist-mono), ui-monospace; font-size:11px; display:grid; gap:4px;">
+                    <div style="display:flex; justify-content:space-between;">
+                      <span style="color:#686c78;">Crime severity</span>
+                      <strong style="color:${tier.color}; font-weight:600;">${crimeScore}</strong>
                     </div>
-                    <div style="display: flex; justify-content: space-between;">
-                      <span style="color: #52525b;">News Sentiment:</span>
-                      <strong style="color: ${badgeColor};">${newsSentiment}</strong>
+                    <div style="display:flex; justify-content:space-between;">
+                      <span style="color:#686c78;">News sentiment</span>
+                      <strong style="color:${tier.color}; font-weight:600;">${newsSentiment}</strong>
                     </div>
                   </div>
                 </div>
               `);
 
               layer.on({
-                mouseover: (e: any) => {
-                  e.target.setStyle({ fillOpacity: 0.7, weight: 3 });
-                },
-                mouseout: (e: any) => {
-                  const currentName = feature.properties?.NSW_LGA__3 || "";
-                  e.target.setStyle({ 
-                    fillOpacity: getThreatOpacity(currentName), 
-                    weight: 1.5 
-                  });
-                },
+                mouseover: (e: LeafletMouseEvent) => (e.target as Path).setStyle({ fillOpacity: Math.min(0.75, tier.fillOpacity + 0.25), weight: 2 }),
+                mouseout:  (e: LeafletMouseEvent) => (e.target as Path).setStyle({ fillOpacity: tier.fillOpacity, weight: 1 }),
               });
             }}
           />
         )}
       </MapContainer>
-      
-      <div className="absolute bottom-4 right-4 z-1000 bg-zinc-900/80 p-4 rounded-xl border border-zinc-800 backdrop-blur-md text-[10px] text-zinc-400 shadow-2xl">
-        <div className="font-bold text-white mb-2 uppercase tracking-widest text-[9px]">Threat Matrix</div>
-        <div className="flex items-center gap-3 mb-2">
-          <span className="w-3 h-3 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]"></span> 
-          <span className="tracking-wide">High Risk Area</span>
-        </div>
-        <div className="flex items-center gap-3 mb-2">
-          <span className="w-3 h-3 rounded-full bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.5)]"></span> 
-          <span className="tracking-wide">Elevated Risk</span>
-        </div>
-        <div className="flex items-center gap-3 mb-2">
-          <span className="w-3 h-3 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]"></span> 
-          <span className="tracking-wide">Low Risk</span>
-        </div>
-        <div className="flex items-center gap-3 pt-2 border-t border-zinc-700/50">
-          <span className="w-3 h-3 rounded-full bg-indigo-500"></span> 
-          <span className="tracking-wide text-zinc-500">Standard Monitoring</span>
-        </div>
-      </div>
     </div>
   );
 }
