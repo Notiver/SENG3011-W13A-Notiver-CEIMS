@@ -1,74 +1,96 @@
 "use client";
 
 import { MapContainer, TileLayer, GeoJSON } from "react-leaflet";
+import type { Feature, FeatureCollection } from "geojson";
+import type { Layer, LeafletMouseEvent, Path } from "leaflet";
 import "leaflet/dist/leaflet.css";
-import L from "leaflet";
 
-interface MapProps {
-  geoJsonData: any;
-  viewMode: "crime" | "housing";
+export type MapViewMode = "crime" | "housing";
+
+interface HousingRecord {
+  statistical_score?: number | string;
+  sentiment_score?: number | string;
+  mean_price?: number | string;
 }
 
-const HIGH_RISK = ["SYDNEY", "BLACKTOWN", "PENRITH", "LIVERPOOL", "MOREE PLAINS", "WALGETT"];
+type LgaProperties = {
+  NSW_LGA__3?: string;
+  NSW_LGA__2?: string;
+  cleanName?: string;
+  liveScore?: number;
+  liveCrimes?: number;
+  housing?: HousingRecord | null;
+};
+
+interface MapProps {
+  geoJsonData: FeatureCollection;
+  viewMode?: MapViewMode;
+}
+
+/* ---------- Crime tiers (seeded for demo) ---------- */
+const HIGH_RISK   = ["SYDNEY", "BLACKTOWN", "PENRITH", "LIVERPOOL", "MOREE PLAINS", "WALGETT"];
 const MEDIUM_RISK = ["PARRAMATTA", "CUMBERLAND", "NEWCASTLE", "CENTRAL COAST", "RANDWICK"];
-const LOW_RISK = ["CANADA BAY", "GEORGES RIVER", "WILLOUGHBY", "RYDE", "KU-RING-GAI"];
+const LOW_RISK    = ["CANADA BAY", "GEORGES RIVER", "WILLOUGHBY", "RYDE", "KU-RING-GAI"];
 
-const getThreatColor = (name: string) => {
-  const upperName = name.toUpperCase();
-  if (HIGH_RISK.includes(upperName)) return "#ef4444"; // Red
-  if (MEDIUM_RISK.includes(upperName)) return "#f97316"; // Orange
-  if (LOW_RISK.includes(upperName)) return "#22c55e"; // Green
-  return "#4f46e5"; // Indigo (Standard)
+const COLOR = {
+  danger:  "#fb7185",
+  warn:    "#fbbf24",
+  success: "#34d399",
+  accent:  "#6366f1",
+  muted:   "#3f3f46",
 };
 
-const getThreatOpacity = (name: string) => {
-  const upperName = name.toUpperCase();
-  if (HIGH_RISK.includes(upperName)) return 0.5;
-  if (MEDIUM_RISK.includes(upperName)) return 0.4;
-  if (LOW_RISK.includes(upperName)) return 0.3;
-  return 0.1;
+const tierFor = (name: string) => {
+  const n = name.toUpperCase();
+  if (HIGH_RISK.includes(n))   return { label: "High risk", color: COLOR.danger,  fillOpacity: 0.42, minC: 0.75, maxC: 0.99, minN: 0.70, maxN: 0.95 };
+  if (MEDIUM_RISK.includes(n)) return { label: "Elevated",  color: COLOR.warn,    fillOpacity: 0.35, minC: 0.35, maxC: 0.65, minN: 0.35, maxN: 0.65 };
+  if (LOW_RISK.includes(n))    return { label: "Low risk",  color: COLOR.success, fillOpacity: 0.28, minC: 0.00, maxC: 0.20, minN: 0.00, maxN: 0.20 };
+  return                        { label: "Standard",       color: COLOR.accent,  fillOpacity: 0.14, minC: 0.10, maxC: 0.30, minN: 0.10, maxN: 0.30 };
 };
 
-const getScore = (lgaName: string, salt: string, min: number, max: number) => {
-  const seedStr = lgaName + salt;
-  let hash = 0;
-  for (let i = 0; i < seedStr.length; i++) {
-    hash = seedStr.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  const normalized = Math.abs(Math.sin(hash)); 
-  return (min + normalized * (max - min)).toFixed(2);
+const seedScore = (name: string, salt: string, min: number, max: number) => {
+  const s = name + salt;
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = s.charCodeAt(i) + ((h << 5) - h);
+  const norm = Math.abs(Math.sin(h));
+  return (min + norm * (max - min)).toFixed(2);
 };
 
+/* ---------- Housing tiers (real data driven) ---------- */
 const getHousingColor = (score: number | null) => {
-  if (score === null) return "#3f3f46"; // Sleek Dark Gray for Water / No Data
-  if (score < 40) return "#ef4444"; 
-  if (score < 70) return "#f97316"; 
-  return "#22c55e"; 
+  if (score === null) return COLOR.muted;
+  if (score < 40) return COLOR.danger;
+  if (score < 70) return COLOR.warn;
+  return COLOR.success;
 };
 
 const getHousingOpacity = (score: number | null) => {
-  if (score === null) return 0.1; // Barely visible for water
-  if (score < 40) return 0.4; 
-  if (score < 70) return 0.3;
-  return 0.2;
+  if (score === null) return 0.08;
+  if (score < 40) return 0.40;
+  if (score < 70) return 0.30;
+  return 0.24;
 };
 
-const formatCurrency = (val: number) => {
-  return new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD', maximumFractionDigits: 0 }).format(val);
-}
+const formatCurrency = (val: number) =>
+  new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", maximumFractionDigits: 0 }).format(val);
 
-export default function Map({ geoJsonData, viewMode }: MapProps) {
+export default function Map({ geoJsonData, viewMode = "crime" }: MapProps) {
   return (
     <div className="h-full w-full relative">
       <MapContainer
         center={[-33.8688, 151.2093]}
         zoom={10}
-        className="h-full w-full outline-none bg-zinc-950"
+        className="h-full w-full outline-none"
+        style={{ background: "var(--surface-0)" }}
         zoomControl={false}
       >
         <TileLayer
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          url="https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png"
           attribution='&copy; <a href="https://carto.com/">CARTO</a>'
+        />
+        <TileLayer
+          url="https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png"
+          attribution=""
         />
 
         {geoJsonData && (
@@ -76,202 +98,134 @@ export default function Map({ geoJsonData, viewMode }: MapProps) {
             key={`${viewMode}-${geoJsonData.features?.length || "loading"}`}
             data={geoJsonData}
             style={(feature) => {
-              const name = feature?.properties?.NSW_LGA__3 || "";
-              
+              const props = feature?.properties as LgaProperties | undefined;
+              const name = props?.NSW_LGA__3 || "";
+
               if (viewMode === "crime") {
+                const tier = tierFor(name);
                 return {
-                  color: "#818cf8",
-                  weight: 1.5,
-                  fillColor: getThreatColor(name),
-                  fillOpacity: getThreatOpacity(name),
-                };
-              } else {
-                const housingScore = feature?.properties?.housing?.statistical_score ?? null; 
-                return {
-                  color: housingScore === null ? "#27272a" : "#34d399", // Darker border for water
-                  weight: 1.5,
-                  fillColor: getHousingColor(housingScore),
-                  fillOpacity: getHousingOpacity(housingScore),
+                  color: "#353846",
+                  weight: 1,
+                  fillColor: tier.color,
+                  fillOpacity: tier.fillOpacity,
                 };
               }
+
+              // housing
+              const rawScore = props?.housing?.statistical_score;
+              const score = rawScore === undefined || rawScore === null || rawScore === "" ? null : Number(rawScore);
+              return {
+                color: "#353846",
+                weight: 1,
+                fillColor: getHousingColor(score),
+                fillOpacity: getHousingOpacity(score),
+              };
             }}
-            onEachFeature={(feature: any, layer: any) => {
-              const name = feature.properties?.NSW_LGA__3 || "Unknown District";
-              const council = feature.properties?.NSW_LGA__2 || "N/A";
-              const upperName = name.toUpperCase();
-
-              // Setup dynamic bounds for our data generation based on the risk tier
-              let riskLabel = "STANDARD";
-              let badgeColor = "#4f46e5";
-              let minCrime = 0.1, maxCrime = 0.3;
-              let minNews = 0.1, maxNews = 0.3;
-
-              if (HIGH_RISK.includes(upperName)) {
-                riskLabel = "HIGH RISK";
-                badgeColor = "#ef4444";
-                minCrime = 0.75; maxCrime = 0.99;
-                minNews = 0.70; maxNews = 0.95;
-              } else if (MEDIUM_RISK.includes(upperName)) {
-                riskLabel = "ELEVATED RISK";
-                badgeColor = "#f97316";
-                minCrime = 0.35; maxCrime = 0.65;
-                minNews = 0.35; maxNews = 0.65;
-              } else if (LOW_RISK.includes(upperName)) {
-                riskLabel = "LOW RISK";
-                badgeColor = "#22c55e";
-                minCrime = 0.00; maxCrime = 0.20;
-                minNews = 0.00; maxNews = 0.20; 
-              }
-
-              const crimeScore = getScore(upperName, "_CRIME", minCrime, maxCrime);
-              const newsSentiment = getScore(upperName, "_NEWS", minNews, maxNews);
-
-              let popupHtml = "";
+            onEachFeature={(feature: Feature, layer: Layer) => {
+              const props = feature.properties as LgaProperties | undefined;
+              const name = props?.NSW_LGA__3 || "Unknown";
+              const council = props?.NSW_LGA__2 || "N/A";
 
               if (viewMode === "crime") {
-                // --- CRIME POPUP ---
-                let riskLabel = "STANDARD";
-                let badgeColor = "#4f46e5";
-                let minCrime = 0.1, maxCrime = 0.3;
-                let minNews = 0.1, maxNews = 0.3;
+                const tier = tierFor(name);
+                const crimeScore    = seedScore(name, "_CRIME", tier.minC, tier.maxC);
+                const newsSentiment = seedScore(name, "_NEWS",  tier.minN, tier.maxN);
 
-                if (HIGH_RISK.includes(upperName)) {
-                  riskLabel = "HIGH RISK"; badgeColor = "#ef4444";
-                  minCrime = 0.75; maxCrime = 0.99; minNews = 0.70; maxNews = 0.95;
-                } else if (MEDIUM_RISK.includes(upperName)) {
-                  riskLabel = "ELEVATED RISK"; badgeColor = "#f97316";
-                  minCrime = 0.35; maxCrime = 0.65; minNews = 0.35; maxNews = 0.65;
-                } else if (LOW_RISK.includes(upperName)) {
-                  riskLabel = "LOW RISK"; badgeColor = "#22c55e";
-                  minCrime = 0.00; maxCrime = 0.20; minNews = 0.00; maxNews = 0.20; 
-                }
-
-                const crimeScore = getScore(upperName, "_CRIME", minCrime, maxCrime);
-                const newsSentiment = getScore(upperName, "_NEWS", minNews, maxNews);
-
-                popupHtml = `
-                  <div style="color: #18181b; font-family: sans-serif; min-width: 180px;">
-                    <strong style="display: block; color: ${badgeColor}; font-size: 10px; text-transform: uppercase; margin-bottom: 2px;">
-                      ${riskLabel} ZONE
-                    </strong>
-                    <div style="font-size: 16px; font-weight: bold; margin-bottom: 2px; text-transform: capitalize;">
+                layer.bindPopup(`
+                  <div style="font-family: var(--font-geist-sans), system-ui; min-width: 200px;">
+                    <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
+                      <span style="width:6px; height:6px; border-radius:2px; background:${tier.color};"></span>
+                      <span style="color:${tier.color}; font-size:10px; letter-spacing:.14em; text-transform:uppercase; font-weight:600;">
+                        ${tier.label}
+                      </span>
+                    </div>
+                    <div style="font-size:14px; font-weight:600; text-transform:capitalize; color:#f5f6f8;">
                       ${name.toLowerCase()}
                     </div>
-                    <div style="font-size: 11px; color: #71717a; margin-bottom: 8px;">
+                    <div style="font-size:11px; color:#9ea1ad; margin-bottom:10px;">
                       ${council}
                     </div>
-                    <div style="border-top: 1px solid #e4e4e7; padding-top: 8px; font-family: monospace; font-size: 11px;">
-                      <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-                        <span style="color: #52525b;">Crime Severity:</span>
-                        <strong style="color: ${badgeColor};">${crimeScore}</strong>
+                    <div style="border-top:1px solid #23262f; padding-top:8px; font-family: var(--font-geist-mono), ui-monospace; font-size:11px; display:grid; gap:4px;">
+                      <div style="display:flex; justify-content:space-between;">
+                        <span style="color:#686c78;">Crime severity</span>
+                        <strong style="color:${tier.color}; font-weight:600;">${crimeScore}</strong>
                       </div>
-                      <div style="display: flex; justify-content: space-between;">
-                        <span style="color: #52525b;">News Sentiment:</span>
-                        <strong style="color: ${badgeColor};">${newsSentiment}</strong>
+                      <div style="display:flex; justify-content:space-between;">
+                        <span style="color:#686c78;">News sentiment</span>
+                        <strong style="color:${tier.color}; font-weight:600;">${newsSentiment}</strong>
                       </div>
                     </div>
                   </div>
-                `;
-              } else {
-                // --- HOUSING POPUP ---
-                const housing = feature.properties?.housing;
-                
-                const statScore = housing?.statistical_score ? parseFloat(housing.statistical_score).toFixed(1) : "N/A";
-                const sentScore = housing?.sentiment_score ? parseFloat(housing.sentiment_score).toFixed(2) : "N/A";
-                const meanPrice = housing?.mean_price ? formatCurrency(parseFloat(housing.mean_price)) : "Data Unavailable";
-                
-                const scoreNum = housing?.statistical_score || 50;
-                const badgeColor = getHousingColor(scoreNum);
-                const label = scoreNum < 40 ? "EXPENSIVE MARKET" : scoreNum < 70 ? "AVERAGE MARKET" : "AFFORDABLE MARKET";
+                `);
 
-                popupHtml = `
-                  <div style="color: #18181b; font-family: sans-serif; min-width: 200px;">
-                    <strong style="display: block; color: ${badgeColor}; font-size: 10px; text-transform: uppercase; margin-bottom: 2px;">
-                      ${label}
-                    </strong>
-                    <div style="font-size: 16px; font-weight: bold; margin-bottom: 2px; text-transform: capitalize;">
+                layer.on({
+                  mouseover: (e: LeafletMouseEvent) =>
+                    (e.target as Path).setStyle({ fillOpacity: Math.min(0.75, tier.fillOpacity + 0.25), weight: 2 }),
+                  mouseout:  (e: LeafletMouseEvent) =>
+                    (e.target as Path).setStyle({ fillOpacity: tier.fillOpacity, weight: 1 }),
+                });
+              } else {
+                // ----- Housing popup -----
+                const housing = props?.housing;
+                const rawScore = housing?.statistical_score;
+                const statNum  = rawScore === undefined || rawScore === null || rawScore === "" ? null : Number(rawScore);
+                const sentNum  = housing?.sentiment_score !== undefined && housing?.sentiment_score !== null && housing?.sentiment_score !== ""
+                  ? Number(housing.sentiment_score) : null;
+                const priceNum = housing?.mean_price !== undefined && housing?.mean_price !== null && housing?.mean_price !== ""
+                  ? Number(housing.mean_price) : null;
+
+                const color = getHousingColor(statNum);
+                const label = statNum === null
+                  ? "No housing data"
+                  : statNum < 40 ? "Expensive market"
+                  : statNum < 70 ? "Average market"
+                  : "Affordable market";
+
+                const statText  = statNum === null ? "—"   : `${statNum.toFixed(1)}/100`;
+                const sentText  = sentNum === null ? "—"   : sentNum.toFixed(2);
+                const priceText = priceNum === null ? "Data unavailable" : formatCurrency(priceNum);
+
+                layer.bindPopup(`
+                  <div style="font-family: var(--font-geist-sans), system-ui; min-width: 210px;">
+                    <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
+                      <span style="width:6px; height:6px; border-radius:2px; background:${color};"></span>
+                      <span style="color:${color}; font-size:10px; letter-spacing:.14em; text-transform:uppercase; font-weight:600;">
+                        ${label}
+                      </span>
+                    </div>
+                    <div style="font-size:14px; font-weight:600; text-transform:capitalize; color:#f5f6f8;">
                       ${name.toLowerCase()}
                     </div>
-                    <div style="font-size: 18px; font-weight: bold; color: #10b981; margin-bottom: 8px;">
-                      ${meanPrice}
+                    <div style="font-size:11px; color:#9ea1ad; margin-bottom:8px;">
+                      ${council}
                     </div>
-                    <div style="border-top: 1px solid #e4e4e7; padding-top: 8px; font-family: monospace; font-size: 11px;">
-                      <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-                        <span style="color: #52525b;">Statistical Score:</span>
-                        <strong style="color: ${badgeColor};">${statScore}/100</strong>
+                    <div style="font-size:16px; font-weight:600; color:#34d399; margin-bottom:10px;">
+                      ${priceText}
+                    </div>
+                    <div style="border-top:1px solid #23262f; padding-top:8px; font-family: var(--font-geist-mono), ui-monospace; font-size:11px; display:grid; gap:4px;">
+                      <div style="display:flex; justify-content:space-between;">
+                        <span style="color:#686c78;">Statistical score</span>
+                        <strong style="color:${color}; font-weight:600;">${statText}</strong>
                       </div>
-                      <div style="display: flex; justify-content: space-between;">
-                        <span style="color: #52525b;">NLP Sentiment:</span>
-                        <strong style="color: ${badgeColor};">${sentScore}</strong>
+                      <div style="display:flex; justify-content:space-between;">
+                        <span style="color:#686c78;">NLP sentiment</span>
+                        <strong style="color:${color}; font-weight:600;">${sentText}</strong>
                       </div>
                     </div>
                   </div>
-                `;
+                `);
+
+                layer.on({
+                  mouseover: (e: LeafletMouseEvent) =>
+                    (e.target as Path).setStyle({ fillOpacity: Math.min(0.75, getHousingOpacity(statNum) + 0.25), weight: 2 }),
+                  mouseout:  (e: LeafletMouseEvent) =>
+                    (e.target as Path).setStyle({ fillOpacity: getHousingOpacity(statNum), weight: 1 }),
+                });
               }
-
-              layer.bindPopup(popupHtml);
-
-              layer.on({
-                mouseover: (e: any) => {
-                  e.target.setStyle({ fillOpacity: 0.7, weight: 3 });
-                },
-                mouseout: (e: any) => {
-                  const currentName = feature.properties?.NSW_LGA__3 || "";
-                  if (viewMode === "crime") {
-                    e.target.setStyle({ fillOpacity: getThreatOpacity(currentName), weight: 1.5 });
-                  } else {
-                    const hScore = feature.properties?.housing?.statistical_score || 50;
-                    e.target.setStyle({ fillOpacity: getHousingOpacity(hScore), weight: 1.5 });
-                  }
-                },
-              });
             }}
           />
         )}
       </MapContainer>
-      
-      {/* Dynamic Legend */}
-      <div className="absolute bottom-4 right-4 z-[1000] bg-zinc-900/80 p-4 rounded-xl border border-zinc-800 backdrop-blur-md text-[10px] text-zinc-400 shadow-2xl">
-        <div className="font-bold text-white mb-2 uppercase tracking-widest text-[9px]">
-          {viewMode === "crime" ? "Threat Matrix" : "Housing Market Matrix"}
-        </div>
-        
-        {viewMode === "crime" ? (
-          <>
-            <div className="flex items-center gap-3 mb-2">
-              <span className="w-3 h-3 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]"></span> 
-              <span className="tracking-wide">High Risk Area</span>
-            </div>
-            <div className="flex items-center gap-3 mb-2">
-              <span className="w-3 h-3 rounded-full bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.5)]"></span> 
-              <span className="tracking-wide">Elevated Risk</span>
-            </div>
-            <div className="flex items-center gap-3 mb-2">
-              <span className="w-3 h-3 rounded-full bg-indigo-500"></span> 
-              <span className="tracking-wide">Standard Risk</span>
-            </div>
-            <div className="flex items-center gap-3 mb-2">
-              <span className="w-3 h-3 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]"></span> 
-              <span className="tracking-wide">Low Risk</span>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="flex items-center gap-3 mb-2">
-              <span className="w-3 h-3 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]"></span> 
-              <span className="tracking-wide">Affordable (Score &gt; 70)</span>
-            </div>
-            <div className="flex items-center gap-3 mb-2">
-              <span className="w-3 h-3 rounded-full bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.5)]"></span> 
-              <span className="tracking-wide">Average (Score 40 - 69)</span>
-            </div>
-            <div className="flex items-center gap-3 mb-2">
-              <span className="w-3 h-3 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]"></span> 
-              <span className="tracking-wide">Expensive (Score &lt; 40)</span>
-            </div>
-          </>
-        )}
-      </div>
     </div>
   );
 }
