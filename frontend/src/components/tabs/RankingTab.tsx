@@ -296,7 +296,6 @@ export default function RankingTab() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3 max-w-[260px]">
-                      {/* Decorative bar — the numeric score is read via the span below */}
                       <div
                         aria-hidden="true"
                         className="flex-1 h-1.5 rounded-full overflow-hidden"
