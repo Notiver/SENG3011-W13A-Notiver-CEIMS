@@ -4,14 +4,10 @@ import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import type { FeatureCollection } from "geojson";
 import "leaflet/dist/leaflet.css";
-import { Layers, Filter, Info, MapPin, Radar } from "lucide-react";
+import { Layers, Info, MapPin, Radar, Home, ShieldAlert } from "lucide-react";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/cn";
-
-interface PublicArticle {
-  lga?: string;
-  sentiment_score?: number;
-}
+import type { MapViewMode } from "@/components/Map";
 
 const Map = dynamic(() => import("../Map"), {
   ssr: false,
@@ -27,11 +23,51 @@ const Map = dynamic(() => import("../Map"), {
 
 type LayerMode = "choropleth" | "heat" | "markers";
 
+interface PublicArticle {
+  lga?: string;
+  sentiment_score?: number;
+}
+
+interface HousingItem {
+  lga?: string;
+  statistical_score?: number | string;
+  sentiment_score?: number | string;
+  mean_price?: number | string;
+}
+
+/**
+ * Normalise LGA names from the backend (which include prefixes like
+ * "COUNCIL OF THE CITY OF ..." or suffixes like " SHIRE COUNCIL") to the
+ * canonical LGA name used inside the GeoJSON properties.
+ */
+const normalizeLgaName = (name: string): string => {
+  if (!name) return "";
+  let n = name.toUpperCase();
+
+  n = n.replace(
+    /^(THE COUNCIL OF THE SHIRE OF |THE COUNCIL OF THE MUNICIPALITY OF |THE COUNCIL OF THE CITY OF |COUNCIL OF THE CITY OF |COUNCIL OF THE SHIRE OF |COUNCIL OF THE MUNICIPALITY OF |CITY OF |SHIRE OF |MUNICIPALITY OF )/g,
+    "",
+  );
+  n = n.replace(
+    /\s+(MUNICIPAL COUNCIL|SHIRE COUNCIL|CITY COUNCIL|REGIONAL COUNCIL|COUNCIL|SHIRE|CITY|MUNICIPALITY)$/g,
+    "",
+  );
+  n = n.trim();
+
+  if (n === "THE HILLS")     return "THE HILLS SHIRE";
+  if (n === "SUTHERLAND")    return "SUTHERLAND SHIRE";
+  if (n === "UPPER HUNTER")  return "UPPER HUNTER SHIRE";
+  if (n === "GREATER HUME")  return "GREATER HUME SHIRE";
+
+  return n;
+};
+
 export default function MapTab() {
   const [geoJsonData, setGeoJsonData] = useState<FeatureCollection | null>(null);
   const [loading, setLoading] = useState(true);
   const [layer, setLayer] = useState<LayerMode>("choropleth");
-  const [stats, setStats] = useState<{ lgaCount: number; articleCount: number } | null>(null);
+  const [viewMode, setViewMode] = useState<MapViewMode>("crime");
+  const [stats, setStats] = useState<{ lgaCount: number; articleCount: number; housingCount: number } | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -41,8 +77,11 @@ export default function MapTab() {
         const geo = await geoRes.json();
 
         const live: Record<string, { score: number; total_crimes: number }> = {};
+        const housing: Record<string, HousingItem> = {};
         let articleCount = 0;
+        let housingCount = 0;
 
+        // --- Community intelligence (crime) ---
         try {
           const pub = await api.getPublicCeimsMap();
           articleCount = pub?.articles?.length || 0;
@@ -61,24 +100,50 @@ export default function MapTab() {
             });
           }
         } catch (e) {
-          console.warn("Live API unavailable; rendering static layer.", e);
+          console.warn("Live crime API unavailable.", e);
+        }
+
+        // --- Housing intelligence ---
+        try {
+          const housingData = (await api.getAllHousing()) as HousingItem[] | undefined;
+          if (Array.isArray(housingData)) {
+            housingCount = housingData.length;
+            housingData.forEach((item) => {
+              if (!item.lga) return;
+              housing[normalizeLgaName(item.lga)] = item;
+            });
+          }
+        } catch (e) {
+          console.warn("Live housing API unavailable.", e);
         }
 
         const enriched: FeatureCollection = {
           ...geo,
           features: (geo as FeatureCollection).features.map((f) => {
             const p = (f.properties || {}) as Record<string, unknown>;
-            const lgaName = typeof p.NSW_LGA__3 === "string" ? p.NSW_LGA__3.toUpperCase() : "";
-            const ld = live[lgaName] || { score: 0, total_crimes: 0 };
+            const rawName = typeof p.NSW_LGA__3 === "string" ? p.NSW_LGA__3 : "";
+            const cleanName = normalizeLgaName(rawName);
+            const isInvalid =
+              cleanName.includes("UNINCORPORATED") || cleanName.includes("WATER") || cleanName === "";
+
+            const ld = isInvalid ? { score: 0, total_crimes: 0 } : (live[cleanName] || { score: 0, total_crimes: 0 });
+            const hd = isInvalid ? null : (housing[cleanName] || null);
+
             return {
               ...f,
-              properties: { ...p, liveScore: ld.score, liveCrimes: ld.total_crimes },
+              properties: {
+                ...p,
+                cleanName,
+                liveScore: ld.score,
+                liveCrimes: ld.total_crimes,
+                housing: hd,
+              },
             };
           }),
         };
 
         setGeoJsonData(enriched);
-        setStats({ lgaCount: enriched.features.length, articleCount });
+        setStats({ lgaCount: enriched.features.length, articleCount, housingCount });
       } catch (e) {
         console.error("Map load error", e);
       } finally {
@@ -103,6 +168,7 @@ export default function MapTab() {
           <div className="flex items-center gap-2 text-[11.5px]">
             <Pill Icon={MapPin} label={`${stats.lgaCount} LGAs`} />
             <Pill Icon={Radar} label={`${stats.articleCount} articles`} />
+            <Pill Icon={Home} label={`${stats.housingCount} housing`} />
           </div>
         )}
       </header>
@@ -124,7 +190,7 @@ export default function MapTab() {
           </div>
         )}
 
-        {geoJsonData && <Map geoJsonData={geoJsonData} />}
+        {geoJsonData && <Map geoJsonData={geoJsonData} viewMode={viewMode} />}
 
         {/* Top-left: layers */}
         <GlassPanel className="top-4 left-4">
@@ -154,35 +220,58 @@ export default function MapTab() {
           </div>
         </GlassPanel>
 
-        {/* Top-right: filter */}
+        {/* Top-right: dataset toggle (crime / housing) */}
         <GlassPanel className="top-4 right-4">
-          <button className="inline-flex items-center gap-1.5 h-7 px-2 rounded-md text-[12px]"
-            style={{ color: "var(--text-2)", background: "var(--surface-2)", border: "1px solid var(--line-2)" }}>
-            <Filter size={12} strokeWidth={2} /> Crime
-          </button>
-          <button className="inline-flex items-center gap-1.5 h-7 px-2 rounded-md text-[12px]"
-            style={{ color: "var(--text-3)", background: "var(--surface-2)", border: "1px solid var(--line-2)" }}>
-            Last 30d
-          </button>
+          <div className="inline-flex rounded-md p-[2px]"
+            style={{ background: "var(--surface-2)", border: "1px solid var(--line-2)" }}
+          >
+            <ModeButton
+              active={viewMode === "crime"}
+              onClick={() => setViewMode("crime")}
+              Icon={ShieldAlert}
+              label="Crime"
+              accent="var(--danger)"
+            />
+            <ModeButton
+              active={viewMode === "housing"}
+              onClick={() => setViewMode("housing")}
+              Icon={Home}
+              label="Housing"
+              accent="var(--success)"
+            />
+          </div>
         </GlassPanel>
 
-        {/* Bottom-left: legend */}
+        {/* Bottom-left: legend (mode-aware) */}
         <GlassPanel className="bottom-4 left-4" stacked>
           <div className="flex items-center gap-1.5 mb-1.5">
             <Info size={11} strokeWidth={2} style={{ color: "var(--text-3)" }} />
             <span className="text-[10.5px] uppercase tracking-[0.14em] font-semibold" style={{ color: "var(--text-3)" }}>
-              Threat band
+              {viewMode === "crime" ? "Threat band" : "Housing market"}
             </span>
           </div>
-          <LegendRow color="var(--danger)" label="High risk" />
-          <LegendRow color="var(--warn)"   label="Elevated" />
-          <LegendRow color="var(--success)" label="Low risk" />
-          <LegendRow color="var(--accent)" label="Standard" muted />
+          {viewMode === "crime" ? (
+            <>
+              <LegendRow color="var(--danger)"  label="High risk" />
+              <LegendRow color="var(--warn)"    label="Elevated" />
+              <LegendRow color="var(--success)" label="Low risk" />
+              <LegendRow color="var(--accent)"  label="Standard" muted />
+            </>
+          ) : (
+            <>
+              <LegendRow color="var(--success)" label="Affordable (≥ 70)" />
+              <LegendRow color="var(--warn)"    label="Average (40–69)" />
+              <LegendRow color="var(--danger)"  label="Expensive (< 40)" />
+              <LegendRow color="#3f3f46"         label="No data" muted />
+            </>
+          )}
         </GlassPanel>
       </div>
     </div>
   );
 }
+
+/* ------------------------------ Primitives ------------------------------ */
 
 function GlassPanel({
   children, className, stacked,
@@ -204,6 +293,31 @@ function GlassPanel({
     >
       {children}
     </div>
+  );
+}
+
+function ModeButton({
+  active, onClick, Icon, label, accent,
+}: {
+  active: boolean;
+  onClick: () => void;
+  Icon: typeof Home;
+  label: string;
+  accent: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="h-6 px-2 rounded inline-flex items-center gap-1.5 text-[11px] font-medium transition-colors"
+      style={{
+        background: active ? "var(--surface-1)" : "transparent",
+        color: active ? "var(--text-0)" : "var(--text-3)",
+        boxShadow: active ? "var(--shadow-1)" : "none",
+      }}
+    >
+      <Icon size={11} strokeWidth={2} style={{ color: active ? accent : "var(--text-3)" }} />
+      {label}
+    </button>
   );
 }
 

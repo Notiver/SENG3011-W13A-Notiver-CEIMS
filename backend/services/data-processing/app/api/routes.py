@@ -51,6 +51,19 @@ def serve_public_ceims_data():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to read public data: {str(e)}")
 
+@router.get("/public/housing-articles", include_in_schema=False)
+def serve_public_housing_data():
+    s3 = boto3.client('s3', region_name=config.REGION if hasattr(config, 'REGION') else "ap-southeast-2")
+    ceims_s3_key = "public/housing/all_processed_articles.json"
+    
+    try:
+        response = s3.get_object(Bucket=config.S3_BUCKET_NAME, Key=ceims_s3_key)
+        return json.loads(response['Body'].read().decode('utf-8'))
+    except s3.exceptions.NoSuchKey:
+        return []
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read public data: {str(e)}")
+
 @router.post("/process-articles/{job_id}", summary="Trigger NLP Sentiment Analysis")
 async def process_articles(job_id: str, request: Request, is_ceims: bool = False):
     """

@@ -4,7 +4,7 @@ from moto import mock_aws
 from unittest.mock import patch, MagicMock
 
 # Adjust the import path based on your folder structure
-from app.services.retriever import process_retrieval, PipelineError
+from app.services.retriever import process_retrieval, PipelineError, sentiment_housing, process_housing
 
 PREFIX="/data-retrieval"
 
@@ -102,7 +102,7 @@ def test_full_pipeline_flow(mock_pop, mock_get):
     assert "Item" in by_year_response, "Sydney 2024 should be in lga-by-year"
     assert by_year_response["Item"]["theft"] == 5
     
-    print("\n✅ Success! Pipeline processed mocked data without global variables.")
+    print("\n Success! Pipeline processed mocked data without global variables.")
 
 
 @patch('app.services.retriever.requests.get')
@@ -123,4 +123,143 @@ def test_pipeline_error_on_api_failure(mock_get):
         
     assert "process_articles crashed!" in str(exc_info.value)
     assert "Status: 500" in str(exc_info.value)
-    print("\n✅ Success! Pipeline gracefully caught the API failure.")
+    print("\n Success! Pipeline gracefully caught the API failure.")
+
+
+@patch('app.services.retriever.requests.get')
+@patch('app.services.retriever.config.API_URL', "http://test")
+def test_sentiment_housing_returns_dict(mock_get):
+    """Should return dictionary directly from API."""
+    mock_get.return_value.status_code = 200
+    mock_get.return_value.json.return_value = {
+        "Sydney": 0.67,
+        "Parramatta": 0.52
+    }
+
+    result = sentiment_housing()
+
+    assert isinstance(result, dict)
+    assert result["Sydney"] == 0.67
+
+@patch('app.services.retriever.requests.get')
+def test_sentiment_housing_non_dict(mock_get):
+    """If API returns list/invalid, should return empty dict."""
+    mock_get.return_value.status_code = 200
+    mock_get.return_value.json.return_value = ["unexpected"]
+
+    result = sentiment_housing()
+
+    assert result == {}
+    
+@patch('app.services.retriever.requests.get')
+def test_sentiment_housing_failure(mock_get):
+    """Should raise PipelineError on API failure."""
+    mock_get.return_value.status_code = 500
+    mock_get.return_value.text = "error"
+
+    with pytest.raises(PipelineError):
+        sentiment_housing()
+
+@mock_aws
+@patch('app.services.retriever.sentiment_housing')
+@patch('app.services.retriever.suburb_to_lga')
+@patch('app.services.retriever.requests.get')
+def test_process_housing_success(mock_get, mock_lga, mock_sentiment):
+    """Tests housing pipeline with new sentiment dict."""
+
+    stage = "staging"
+
+    mock_lga.return_value = "Sydney"
+
+    # ✅ NEW: dictionary, not float
+    mock_sentiment.return_value = {"Sydney": 0.5}
+
+    mock_response = MagicMock()
+    mock_response.raise_for_status.return_value = None
+    mock_response.json.return_value = {"average": 1000000}
+
+    mock_get.return_value = mock_response
+
+    dynamodb = boto3.resource("dynamodb", region_name="us-east-1")
+
+    dynamodb.create_table(
+        TableName=f'lga-housing-{stage}',
+        KeySchema=[{'AttributeName': 'lga', 'KeyType': 'HASH'}],
+        AttributeDefinitions=[{'AttributeName': 'lga', 'AttributeType': 'S'}],
+        ProvisionedThroughput={'ReadCapacityUnits': 1, 'WriteCapacityUnits': 1}
+    )
+
+    process_housing(dynamodb_resource=dynamodb, stage=stage)
+
+    table = dynamodb.Table(f'lga-housing-{stage}')
+    items = table.scan()["Items"]
+
+    assert len(items) > 0
+    assert items[0]["lga"] == "Sydney"
+
+    # Optional deeper check
+    assert float(items[0]["sentiment_score"]) == 0.5
+    
+
+@mock_aws
+@patch('app.services.retriever.sentiment_housing')
+@patch('app.services.retriever.suburb_to_lga')
+@patch('app.services.retriever.requests.get')
+def test_process_housing_missing_sentiment(mock_get, mock_lga, mock_sentiment):
+    """If LGA not in sentiment dict → default 0."""
+
+    stage = "staging"
+
+    mock_lga.return_value = "Sydney"
+
+    # Sydney NOT in dict
+    mock_sentiment.return_value = {}
+
+    mock_response = MagicMock()
+    mock_response.raise_for_status.return_value = None
+    mock_response.json.return_value = {"average": 1000000}
+
+    mock_get.return_value = mock_response
+
+    dynamodb = boto3.resource("dynamodb", region_name="us-east-1")
+
+    dynamodb.create_table(
+        TableName=f'lga-housing-{stage}',
+        KeySchema=[{'AttributeName': 'lga', 'KeyType': 'HASH'}],
+        AttributeDefinitions=[{'AttributeName': 'lga', 'AttributeType': 'S'}],
+        ProvisionedThroughput={'ReadCapacityUnits': 1, 'WriteCapacityUnits': 1}
+    )
+
+    process_housing(dynamodb_resource=dynamodb, stage=stage)
+
+    table = dynamodb.Table(f'lga-housing-{stage}')
+    items = table.scan()["Items"]
+
+    assert float(items[0]["sentiment_score"]) == 0.0
+    
+@mock_aws
+@patch('app.services.retriever.sentiment_housing', return_value={"Sydney": 0.5})
+@patch('app.services.retriever.suburb_to_lga', return_value="Sydney")
+@patch('app.services.retriever.requests.get')
+def test_process_housing_api_failure(mock_get, *_):
+    """API failure should skip but not crash."""
+
+    stage = "staging"
+
+    mock_get.side_effect = Exception("API down")
+
+    dynamodb = boto3.resource("dynamodb", region_name="us-east-1")
+
+    dynamodb.create_table(
+        TableName=f'lga-housing-{stage}',
+        KeySchema=[{'AttributeName': 'lga', 'KeyType': 'HASH'}],
+        AttributeDefinitions=[{'AttributeName': 'lga', 'AttributeType': 'S'}],
+        ProvisionedThroughput={'ReadCapacityUnits': 1, 'WriteCapacityUnits': 1}
+    )
+
+    process_housing(dynamodb_resource=dynamodb, stage=stage)
+
+    table = dynamodb.Table(f'lga-housing-{stage}')
+    items = table.scan()["Items"]
+
+    assert isinstance(items, list)

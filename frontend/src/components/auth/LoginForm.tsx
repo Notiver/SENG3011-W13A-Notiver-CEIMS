@@ -64,7 +64,7 @@ export default function LoginForm({ onLogin }: LoginFormProps) {
               Notiver
             </div>
             <div className="text-[10.5px] uppercase tracking-[0.16em]" style={{ color: "var(--text-3)" }}>
-              Crime intelligence
+              Cross-event intelligence
             </div>
           </div>
         </div>
