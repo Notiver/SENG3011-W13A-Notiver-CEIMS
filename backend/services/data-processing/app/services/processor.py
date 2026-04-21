@@ -1,7 +1,6 @@
 import boto3
 import json
 import requests
-from datetime import datetime
 from transformers import pipeline
 
 from app import config

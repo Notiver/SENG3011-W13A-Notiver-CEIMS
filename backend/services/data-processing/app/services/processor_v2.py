@@ -1,7 +1,6 @@
 import boto3
 import json
 import requests
-from datetime import datetime
 
 from app import config
 from utils.crime_classifier import classify_crime
