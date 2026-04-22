@@ -28,9 +28,61 @@ _SUBURB_DATA_PATH = os.path.join(
 )
 
 
+def _normalise_lga_key(raw: str) -> str:
+    """
+    Accept either the `lganame` ("CUMBERLAND") or the `councilname`
+    ("CUMBERLAND COUNCIL", "THE COUNCIL OF THE CITY OF SYDNEY", etc.) and
+    reduce it to the LGA-name form used as the index key. The
+    /data-retrieval/lgas endpoint stores council names, so the scraper has
+    to resolve either form.
+    """
+    if not raw:
+        return ""
+    k = raw.strip().upper()
+
+    # Leading "(THE) COUNCIL OF THE (CITY|SHIRE|MUNICIPALITY) OF ..." -> drop it.
+    prefixes = (
+        "THE COUNCIL OF THE CITY OF ",
+        "THE COUNCIL OF THE SHIRE OF ",
+        "THE COUNCIL OF THE MUNICIPALITY OF ",
+        "COUNCIL OF THE CITY OF ",
+        "COUNCIL OF THE SHIRE OF ",
+        "COUNCIL OF THE MUNICIPALITY OF ",
+        "CITY OF ",
+        "SHIRE OF ",
+        "MUNICIPALITY OF ",
+    )
+    for p in prefixes:
+        if k.startswith(p):
+            k = k[len(p):]
+            break
+
+    # Trailing "(REGIONAL|CITY|SHIRE|MUNICIPAL) COUNCIL" / "COUNCIL" -> drop it.
+    suffixes = (
+        " REGIONAL COUNCIL",
+        " MUNICIPAL COUNCIL",
+        " SHIRE COUNCIL",
+        " CITY COUNCIL",
+        " COUNCIL",
+        " SHIRE",
+        " CITY",
+        " MUNICIPALITY",
+    )
+    for s in suffixes:
+        if k.endswith(s):
+            k = k[: -len(s)]
+            break
+
+    return k.strip()
+
+
 @lru_cache(maxsize=1)
 def _load_lga_suburb_index():
-    """Return { normalised LGA name -> [suburb, ...] } for NSW."""
+    """
+    Return { key -> [suburb, ...] } where key is both the LGA name (e.g.
+    "CUMBERLAND") and the full council name (e.g. "CUMBERLAND COUNCIL").
+    Caller may pass either form.
+    """
     try:
         with open(_SUBURB_DATA_PATH, "r", encoding="utf-8") as fh:
             raw = json.load(fh)
@@ -41,16 +93,38 @@ def _load_lga_suburb_index():
     index: dict[str, list[str]] = {}
     for suburb, meta in raw.items():
         lga = (meta.get("lganame") or "").strip().upper()
-        if not lga:
+        council = (meta.get("councilname") or "").strip().upper()
+        if not lga and not council:
             continue
-        index.setdefault(lga, []).append(suburb.strip())
+        suburb_name = suburb.strip()
+        for key in (lga, council, _normalise_lga_key(council)):
+            if key:
+                index.setdefault(key, []).append(suburb_name)
+
+    # Deduplicate the suburb lists (same suburb can be inserted under both
+    # the lganame and councilname keys).
+    for key, suburbs in index.items():
+        seen: set[str] = set()
+        deduped: list[str] = []
+        for s in suburbs:
+            if s in seen:
+                continue
+            seen.add(s)
+            deduped.append(s)
+        index[key] = deduped
     return index
 
 
 def _suburbs_for_lga(lga_name: str) -> list[str]:
     if not lga_name:
         return []
-    return _load_lga_suburb_index().get(lga_name.strip().upper(), [])
+    idx = _load_lga_suburb_index()
+    key_upper = lga_name.strip().upper()
+    # Try: exact council name -> exact LGA name -> normalised key.
+    for candidate in (key_upper, _normalise_lga_key(lga_name)):
+        if candidate and candidate in idx:
+            return idx[candidate]
+    return []
 
 CATEGORY_CONFIG = {
     "crime": {"query": "(police OR crime OR murder OR theft)", "section": "news|world|australia-news"},
@@ -83,6 +157,13 @@ def run_dynamic_scraper(location: str, time_frame: str, category: str, user_id: 
     city_variants = [primary_city]
     if "-" in primary_city:
         city_variants.append(primary_city.replace("-", " "))
+
+    # If the caller passed the full council name ("CUMBERLAND COUNCIL") also
+    # try the bare LGA form ("CUMBERLAND") — the generic "COUNCIL" suffix
+    # weakens the Guardian match and pulls in UK council articles.
+    normalised = _normalise_lga_key(primary_city)
+    if normalised and normalised.upper() != primary_city.upper():
+        city_variants.append(normalised.title())
 
     # The complete list of Guardian search terms for this job. In local mode
     # we expand to cover every suburb in the selected LGA because AU news
@@ -214,8 +295,13 @@ def run_dynamic_scraper(location: str, time_frame: str, category: str, user_id: 
             
         try:
             response = requests.get(url, params=params, timeout=10)
+            # Always log the final URL for the first request of each job so
+            # CloudWatch shows us exactly what the Guardian is being asked
+            # — the easiest way to debug CEIMS "wrong article" reports.
+            print(f"GUARDIAN REQ [{q['from_date']} -> {q['to_date']}]: {response.url}")
             if response.status_code == 200:
                 results = response.json().get("response", {}).get("results", [])
+                print(f"  -> {len(results)} results returned")
                 for item in results:
                     web_url = item.get('webUrl')
                     # Guardian's webPublicationDate is the authoritative publish
@@ -227,7 +313,6 @@ def run_dynamic_scraper(location: str, time_frame: str, category: str, user_id: 
                         article_data[web_url] = pub_date
             else:
                 print(f"API ERROR {response.status_code}: {response.text}")
-                print(f"DEBUG URL: {response.url}")
         except Exception as e:
             print(f"Guardian API Request failed for {q['from_date']}: {e}")
 
