@@ -2,13 +2,55 @@ import requests
 import newspaper
 import boto3
 import os
+import json
 import traceback
 import calendar
 from datetime import datetime, timedelta
+from functools import lru_cache
 from app import config
 from aws_lambda_powertools import Tracer
 
 tracer = Tracer(service="data-collection")
+
+
+# ---------------------------------------------------------------------------
+# Suburb-to-LGA expansion
+#
+# Australian news articles almost always reference the suburb name
+# ("Punchbowl", "Bankstown") rather than the council name
+# ("Canterbury-Bankstown"). When a user targets an LGA we expand the Guardian
+# search and the relevance filter to every suburb that belongs to that LGA,
+# so a Punchbowl stabbing lands under its parent council automatically.
+# ---------------------------------------------------------------------------
+
+_SUBURB_DATA_PATH = os.path.join(
+    os.path.dirname(__file__), "..", "utils", "SUBURB_TO_LGA_DATA.json"
+)
+
+
+@lru_cache(maxsize=1)
+def _load_lga_suburb_index():
+    """Return { normalised LGA name -> [suburb, ...] } for NSW."""
+    try:
+        with open(_SUBURB_DATA_PATH, "r", encoding="utf-8") as fh:
+            raw = json.load(fh)
+    except Exception as exc:
+        print(f"SUBURB_TO_LGA_DATA unavailable ({exc}); proceeding without suburb expansion.")
+        return {}
+
+    index: dict[str, list[str]] = {}
+    for suburb, meta in raw.items():
+        lga = (meta.get("lganame") or "").strip().upper()
+        if not lga:
+            continue
+        index.setdefault(lga, []).append(suburb.strip())
+    return index
+
+
+def _suburbs_for_lga(lga_name: str) -> list[str]:
+    if not lga_name:
+        return []
+    return _load_lga_suburb_index().get(lga_name.strip().upper(), [])
 
 CATEGORY_CONFIG = {
     "crime": {"query": "(police OR crime OR murder OR theft)", "section": "news|world|australia-news"},
@@ -42,14 +84,46 @@ def run_dynamic_scraper(location: str, time_frame: str, category: str, user_id: 
     if "-" in primary_city:
         city_variants.append(primary_city.replace("-", " "))
 
+    # The complete list of Guardian search terms for this job. In local mode
+    # we expand to cover every suburb in the selected LGA because AU news
+    # references suburbs far more often than council names.
+    search_terms: list[str] = []
+    seen_lc: set[str] = set()
+
+    def _add_term(term: str) -> None:
+        t = (term or "").strip()
+        if not t or len(t) < 4:
+            return  # drop pathologically short tokens (avoid false positives)
+        key = t.lower()
+        if key in seen_lc:
+            return
+        seen_lc.add(key)
+        search_terms.append(t)
+
+    for v in city_variants:
+        _add_term(v)
+
     if local_mode:
-        city_clause = " OR ".join(f'"{v}"' for v in city_variants)
+        for suburb in _suburbs_for_lga(primary_city):
+            _add_term(suburb)
+
+        # Guardian accepts long q= strings, but keep the OR list bounded so
+        # the request URL stays well under 8 KB even when a council has
+        # 150+ suburbs (Mid-Coast, Central Coast, etc.).
+        QUERY_CAP = 50
+        query_terms = search_terms[:QUERY_CAP]
+        clause = " OR ".join(f'"{t}"' for t in query_terms)
         search_query = (
-            f'({city_clause}) '
+            f'({clause}) '
             f'AND (Sydney OR NSW OR "New South Wales" OR Australia OR Australian) '
             f'AND {cat_config["query"]}'
         )
         section_override = "australia-news"
+        print(
+            f"Local mode expansion: {len(search_terms)} terms "
+            f"(LGA + {max(0, len(search_terms) - len(city_variants))} suburbs), "
+            f"querying top {len(query_terms)}."
+        )
     else:
         search_query = f'"{primary_city}" AND {cat_config["query"]}'
         section_override = None
@@ -168,8 +242,10 @@ def run_dynamic_scraper(location: str, time_frame: str, category: str, user_id: 
 
     scraped_data = []
 
-    # Precomputed lowercase variants for the per-article body check.
-    city_variants_lc = [v.lower() for v in city_variants]
+    # Lowercased term list for the per-article body relevance check. For LGA
+    # mode this covers the council name plus every suburb; for global mode
+    # it's just the primary city.
+    match_terms_lc = [t.lower() for t in (search_terms if local_mode else [primary_city])]
     AUS_TOKENS = ("nsw", "new south wales", "sydney", "australia", "australian")
 
     for i, (article_url, real_publish_date) in enumerate(article_data.items()):
@@ -182,15 +258,15 @@ def run_dynamic_scraper(location: str, time_frame: str, category: str, user_id: 
             if content:
                 body = content.lower()
                 if local_mode:
-                    # For NSW LGAs we must see BOTH the LGA name AND Australian
-                    # context in the body. This rejects UK / global articles
-                    # that happen to drop a one-word mention in passing (e.g.
-                    # a London piece referencing Bondi Beach).
-                    has_city = any(v in body for v in city_variants_lc)
+                    # For NSW LGAs the body must mention the council or one
+                    # of its suburbs AND sit in an Australian context. This
+                    # rejects UK / global articles that happen to drop a
+                    # one-word mention in passing.
+                    has_term = any(t in body for t in match_terms_lc)
                     has_aus = any(t in body for t in AUS_TOKENS)
-                    if not (has_city and has_aus):
+                    if not (has_term and has_aus):
                         print(
-                            f"Skipped (no AU + '{primary_city}' context): {article_url}"
+                            f"Skipped (no AU + '{primary_city}' or suburb context): {article_url}"
                         )
                         continue
                 else:
