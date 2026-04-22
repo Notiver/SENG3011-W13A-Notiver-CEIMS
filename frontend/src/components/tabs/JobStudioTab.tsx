@@ -55,6 +55,7 @@ export default function JobStudioTab() {
   const [fullArticles, setFullArticles] = useState<ArticleRecord[]>([]);
   const [articles, setArticles] = useState<ArticleRecord[]>([]);
   const [selectedArticle, setSelectedArticle] = useState<ArticleRecord | null>(null);
+  const [scrapeComplete, setScrapeComplete] = useState(false);
 
   const [isFallback, setIsFallback] = useState(false);
   const [fallbackUrls, setFallbackUrls] = useState<string[]>([]);
@@ -163,6 +164,7 @@ export default function JobStudioTab() {
     } finally {
       setLoading(false);
       setIsPolling(false);
+      setScrapeComplete(true);
       setJob({ stage: "ready" });
     }
   };
@@ -171,10 +173,18 @@ export default function JobStudioTab() {
     try {
       const data = await api.checkScrapeStatus(jobId);
       if (data.status === "complete") {
-        const arr = Array.isArray(data.articles) ? data.articles : data.articles?.articles || [];
+        // Handles both legacy (bare array) and current (worker-wrapped payload)
+        // shapes returned by /data-collection/collect-articles/{job_id}.
+        const nested = data.articles?.articles;
+        const arr: ArticleRecord[] = Array.isArray(data.articles)
+          ? data.articles
+          : Array.isArray(nested)
+            ? nested
+            : [];
         setFullArticles(arr);
         setIsPolling(false);
         setLoading(false);
+        setScrapeComplete(true);
         setJob({ stage: "ready", articlesCount: arr.length });
       } else if (data.status === "processing") {
         setTimeout(() => pollScrape(jobId), 5000);
@@ -226,6 +236,7 @@ export default function JobStudioTab() {
     setFallbackUrls([]);
     setVisibleFallback([]);
     setProcessedIntelligence(null);
+    setScrapeComplete(false);
 
     setJob({
       stage: "queued",
@@ -251,6 +262,7 @@ export default function JobStudioTab() {
       } else if (data.articles && data.articles.length > 0) {
         setFullArticles(data.articles);
         setLoading(false);
+        setScrapeComplete(true);
         setJob({ stage: "ready", articlesCount: data.articles.length });
       } else {
         throw new Error("Zero articles returned");
@@ -304,14 +316,16 @@ export default function JobStudioTab() {
 
   /* ----------------------- Derived ----------------------- */
   const stageStates: Record<Stage, StageState> = useMemo(() => {
-    const scraped = fullArticles.length > 0 || isFallback;
+    // Scrape is "done" once the pipeline has run to completion, even if zero
+    // articles matched — that's a valid outcome, not a pending state.
+    const scraped = scrapeComplete || fullArticles.length > 0 || isFallback;
     return {
       scrape:  loading || isPolling ? "running" : scraped ? "done" : "pending",
       nlp:     isProcessing && processStep === 1 ? "running" : processStep >= 2 ? "done" : "pending",
       enrich:  processStep === 2 ? "running" : processStep >= 3 ? "done" : "pending",
       publish: processStep === 3 ? "done" : "pending",
     };
-  }, [loading, isPolling, fullArticles.length, isFallback, isProcessing, processStep]);
+  }, [loading, isPolling, scrapeComplete, fullArticles.length, isFallback, isProcessing, processStep]);
 
   const disabled = loading || isProcessing;
 
@@ -577,6 +591,7 @@ export default function JobStudioTab() {
                     ? `Target ${expectedCount(timeFrame)} · ${Math.round(scrapeProgress)}%`
                     : isFallback ? `${fallbackUrls.length} URLs recovered (fallback)`
                     : fullArticles.length > 0 ? `${fullArticles.length} articles captured`
+                    : scrapeComplete ? "Completed · no articles matched"
                     : "Fetch from the target source"
                 }
                 state={stageStates.scrape}
@@ -613,22 +628,24 @@ export default function JobStudioTab() {
               />
             </div>
 
-            {(fullArticles.length > 0 || fallbackUrls.length > 0) && !isProcessing && (
+            {(scrapeComplete || fullArticles.length > 0 || fallbackUrls.length > 0) && !isProcessing && (
               <div
                 className="flex items-center gap-2 px-5 py-3 border-t"
                 style={{ borderColor: "var(--line-1)", background: "var(--surface-1)" }}
               >
-                <button
-                  onClick={handleDownload}
-                  className="h-8 px-3 rounded-[10px] text-[12px] font-medium inline-flex items-center gap-1.5 transition-colors"
-                  style={{
-                    background: "transparent",
-                    color: "var(--text-2)",
-                    border: "1px solid var(--line-2)",
-                  }}
-                >
-                  <Download size={12} strokeWidth={2} /> URLs
-                </button>
+                {(fullArticles.length > 0 || fallbackUrls.length > 0) && (
+                  <button
+                    onClick={handleDownload}
+                    className="h-8 px-3 rounded-[10px] text-[12px] font-medium inline-flex items-center gap-1.5 transition-colors"
+                    style={{
+                      background: "transparent",
+                      color: "var(--text-2)",
+                      border: "1px solid var(--line-2)",
+                    }}
+                  >
+                    <Download size={12} strokeWidth={2} /> URLs
+                  </button>
+                )}
                 {processStep >= 3 && !!processedIntelligence && (
                   <button
                     onClick={handleDownloadIntelligence}
@@ -683,8 +700,8 @@ export default function JobStudioTab() {
             </div>
 
             <div className="px-5 pb-5 flex-1 overflow-y-auto custom-scrollbar space-y-1.5">
-              {/* Idle / empty */}
-              {!loading && !isPolling && articles.length === 0 && !isFallback && (
+              {/* Idle — never run */}
+              {!loading && !isPolling && articles.length === 0 && !isFallback && !scrapeComplete && (
                 <div className="h-full min-h-[240px] grid place-items-center">
                   <div className="text-center">
                     <div
@@ -698,6 +715,34 @@ export default function JobStudioTab() {
                     </div>
                     <div className="text-[11.5px] mt-1" style={{ color: "var(--text-3)" }}>
                       Configure on the left and hit <span className="font-mono" style={{ color: "var(--text-1)" }}>Run job</span>.
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Completed — zero matches */}
+              {!loading && !isPolling && articles.length === 0 && !isFallback && scrapeComplete && (
+                <div className="h-full min-h-[240px] grid place-items-center">
+                  <div className="text-center max-w-[320px]">
+                    <div
+                      className="w-10 h-10 grid place-items-center rounded-full mx-auto mb-3"
+                      style={{ background: "var(--warn-soft)", border: "1px solid var(--line-2)" }}
+                    >
+                      <CheckCircle2 size={16} strokeWidth={1.75} style={{ color: "var(--warn)" }} />
+                    </div>
+                    <div className="text-[13.5px] font-medium" style={{ color: "var(--text-1)" }}>
+                      Scrape complete · no articles matched
+                    </div>
+                    <div className="text-[11.5px] mt-1 leading-relaxed" style={{ color: "var(--text-3)" }}>
+                      The source returned zero results for{" "}
+                      <span className="font-mono" style={{ color: "var(--text-2)" }}>
+                        {selectedCategory}
+                      </span>{" "}
+                      in{" "}
+                      <span className="font-mono capitalize" style={{ color: "var(--text-2)" }}>
+                        {location.toLowerCase()}
+                      </span>
+                      . Try widening the timeframe or picking a different subject.
                     </div>
                   </div>
                 </div>

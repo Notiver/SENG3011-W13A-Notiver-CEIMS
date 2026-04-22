@@ -24,11 +24,36 @@ CATEGORY_CONFIG = {
 @tracer.capture_method
 def run_dynamic_scraper(location: str, time_frame: str, category: str, user_id: str = "guest_user"):
     print(f"Starting dynamic scrape for User: {user_id} | Loc: {location} | Cat: {category} | Time: {time_frame}")
-    
+
     cat_config = CATEGORY_CONFIG.get(category, {"query": category, "section": None})
     primary_city = location.split(',')[0].strip()
-    search_query = f'"{primary_city}" AND {cat_config["query"]}'
-    
+
+    # Locations without a country suffix (e.g. "Canterbury-Bankstown") are
+    # treated as NSW LGAs. For those we constrain both the Guardian query and
+    # the section so UK / global articles that happen to share a token
+    # ("Canterbury" in Kent, "Sydney" in a UK context, etc.) can't bleed in.
+    local_mode = "," not in location
+
+    # For hyphenated LGA names, Guardian tokenises the phrase loosely. We
+    # search for both the hyphenated form and the space-separated form so
+    # either headline style ("Canterbury-Bankstown" vs "Canterbury Bankstown")
+    # lands a hit.
+    city_variants = [primary_city]
+    if "-" in primary_city:
+        city_variants.append(primary_city.replace("-", " "))
+
+    if local_mode:
+        city_clause = " OR ".join(f'"{v}"' for v in city_variants)
+        search_query = (
+            f'({city_clause}) '
+            f'AND (Sydney OR NSW OR "New South Wales" OR Australia OR Australian) '
+            f'AND {cat_config["query"]}'
+        )
+        section_override = "australia-news"
+    else:
+        search_query = f'"{primary_city}" AND {cat_config["query"]}'
+        section_override = None
+
     current_date = datetime.now()
     api_queries = []
 
@@ -108,7 +133,9 @@ def run_dynamic_scraper(location: str, time_frame: str, category: str, user_id: 
             "order-by": "relevance"
         }
         
-        if cat_config["section"]:
+        if section_override:
+            params["section"] = section_override
+        elif cat_config["section"]:
             params["section"] = cat_config["section"]
             
         try:
@@ -141,6 +168,10 @@ def run_dynamic_scraper(location: str, time_frame: str, category: str, user_id: 
 
     scraped_data = []
 
+    # Precomputed lowercase variants for the per-article body check.
+    city_variants_lc = [v.lower() for v in city_variants]
+    AUS_TOKENS = ("nsw", "new south wales", "sydney", "australia", "australian")
+
     for i, (article_url, real_publish_date) in enumerate(article_data.items()):
         try:
             article = newspaper.article(article_url)
@@ -148,15 +179,25 @@ def run_dynamic_scraper(location: str, time_frame: str, category: str, user_id: 
             article.parse()
             content = article.text
 
-            # The Guardian search already filters on the city keyword, so we
-            # just need a light sanity check that the body mentions it at
-            # least once. Previously we required >= 3 mentions which was too
-            # aggressive and commonly trimmed 60 target articles to ~6.
             if content:
-                mention_count = content.lower().count(primary_city.lower())
-                if mention_count < 1:
-                    print(f"Skipped (no body mention of '{primary_city}'): {article_url}")
-                    continue
+                body = content.lower()
+                if local_mode:
+                    # For NSW LGAs we must see BOTH the LGA name AND Australian
+                    # context in the body. This rejects UK / global articles
+                    # that happen to drop a one-word mention in passing (e.g.
+                    # a London piece referencing Bondi Beach).
+                    has_city = any(v in body for v in city_variants_lc)
+                    has_aus = any(t in body for t in AUS_TOKENS)
+                    if not (has_city and has_aus):
+                        print(
+                            f"Skipped (no AU + '{primary_city}' context): {article_url}"
+                        )
+                        continue
+                else:
+                    # Global locations — a single body mention suffices.
+                    if body.count(primary_city.lower()) < 1:
+                        print(f"Skipped (no body mention of '{primary_city}'): {article_url}")
+                        continue
 
             real_title = article.title if article.title else "News Report"
 
