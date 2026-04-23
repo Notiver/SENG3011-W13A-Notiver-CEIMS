@@ -1,7 +1,7 @@
 import httpx
 from util_auth import STAGING_JWT
 
-from util_config import API_URL, COLLECTION_ROUTE, PROCESSING_ROUTE, \
+from util_config import API_URL, COLLECTION_ROUTE, \
     RETRIEVAL_ROUTE, BUCKET, TIMEOUT
 
 from conftest import wait_for_s3_object
