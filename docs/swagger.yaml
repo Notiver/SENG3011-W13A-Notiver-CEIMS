@@ -404,6 +404,30 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /run-retrieval-housing:
+    post:
+      tags:
+        - Data Retrieval
+      summary: Retrieves and processes data scores to put in DynamoDB, specifically for housing
+      operationId: runRetrievalHousing
+      description: This endpoint fetches housing data from CoudBelly and processed article data from the Data Processing (NLP), aggregates suburb data into LGA statistics, calculates sentiment and statistical crime scores before finally storing the aggregated data into DynamoDB tables (lga-housing). 
+      responses:
+        '200':
+          description: Successfully ran pipeline
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Retrieval pipeline completed successfully"
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /lgas:
     get:
       tags:
@@ -533,6 +557,85 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+/lga/{lga}/housing:
+    get:
+      tags:
+        - Data Retrieval
+      summary: Get Housing Aggregate Regional Statistics
+      operationId: getSpecificHousing
+      description: Fetches the overall aggregated housing, sentiment, and risk statistics for a specific Local Government Area (LGA).
+      parameters:
+        - name: lga
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The exact string name of the LGA (e.g., "City of Sydney")
+      responses:
+        '200':
+          description: Successfully retrieved specific LGA housing data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    lga:
+                      type: string
+                      example: "Lane Cove Municipal Council"
+                    statistical_score:
+                      type: number
+                      example: 35.77
+                    sentiment_score:
+                      type: number
+                      example: 0.5
+                    mean_price:
+                      type: number
+                      example: 1929590.91
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /housing:
+    get:
+      tags:
+        - Data Retrieval
+      summary: Get All Housing Aggregate Regional Statistics
+      operationId: getAllHousing
+      description: Fetches all the aggregated housing, sentiment, and risk statistics for all NSW LGAs.
+      responses:
+        '200':
+          description: Successfully retrieved all LGA housing data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    lga:
+                      type: string
+                      example: "Lane Cove Municipal Council"
+                    statistical_score:
+                      type: number
+                      example: 35.77
+                    sentiment_score:
+                      type: number
+                      example: 0.5
+                    mean_price:
+                      type: number
+                      example: 1929590.91
         '500':
           description: Internal Server Error
           content:
