@@ -1,7 +1,6 @@
 import boto3
 import json
 import requests
-from datetime import datetime
 
 from app import config
 from utils.crime_classifier import classify_crime
@@ -107,12 +106,15 @@ def run_nlp_pipeline(job_id: str, user_id: str = "guest_user", auth_header: str 
             negative_sentiment = scores.get('negative', 0)
             base_id = file_key.split('/')[-1].replace('.txt', '') if file_key else "unknown"
             
+            # Preserve the real publish_date captured upstream; if it isn't
+            # available leave "when" as None rather than stamping today so
+            # downstream UIs can render "—" instead of misleading dates.
             entry = {
                 "object_id": base_id,
                 "source_type": "news",
                 "offence_type": offence,
                 "sentiment_score": negative_sentiment,
-                "when": metadata.get('publish_date', datetime.now().isoformat()),
+                "when": metadata.get('publish_date') or None,
                 "suburb": suburb,
                 "lga": lga,
                 "postcode": postcode,

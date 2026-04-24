@@ -1,7 +1,6 @@
 import boto3
 import json
 import requests
-from datetime import datetime
 from transformers import pipeline
 
 from app import config
@@ -70,7 +69,7 @@ def run_nlp_pipeline():
                 skipped_count += 1
                 continue
             
-            article_date = metadata.get('publish_date', datetime.now().isoformat())
+            article_date = metadata.get('publish_date') or None
             
             sentiment_results = sentiment_task(text_content[:1500])
             scores = {res['label']: round(res['score'], 4) for res in sentiment_results[0]}
